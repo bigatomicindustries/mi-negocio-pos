@@ -321,7 +321,10 @@ export default function ProspectosPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <Link href="/superadmin" className="text-sm font-semibold text-green-700">← Negocios</Link>
+        <nav aria-label="Navegación comercial" className="flex flex-wrap gap-5 text-sm font-semibold">
+          <Link href="/superadmin" className="text-green-700 hover:underline">← Negocios</Link>
+          <Link href="/superadmin/tablero" className="text-green-700 hover:underline">Tablero comercial · CRM 1.2 →</Link>
+        </nav>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-green-600">Administración SaaS · CRM 1.1</p>
