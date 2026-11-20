@@ -138,6 +138,9 @@ console.error(
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-12">
       <div className="mx-auto max-w-6xl">
+        {esPlatformAdmin && <div className="mb-6 flex justify-end">
+          <Link href="/superadmin/prospectos" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800">Prospectos · CRM →</Link>
+        </div>}
 
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-green-600">
