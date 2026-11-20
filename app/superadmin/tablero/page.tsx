@@ -170,7 +170,6 @@ export default function TableroComercialPage() {
           .in("estado", estadosAbiertos)
           .lte("crm_proximo_contacto", sumarDias(hoy, 7))
           .order("crm_proximo_contacto", { ascending: true })
-          .order("crm_prioridad", { ascending: false })
           .limit(8),
         supabase.from("crm_actividades")
           .select("id,tipo,detalle,created_at,demo_request_id,lead_id")
@@ -305,7 +304,7 @@ export default function TableroComercialPage() {
                 </div>
               ))}
             </div>
-            <h3 className="mt-6 font-bold text-slate-900">Contactos prioritarios por fecha</h3>
+            <h3 className="mt-6 font-bold text-slate-900">Contactos por atender</h3>
             <p className="mt-1 text-xs text-slate-500">Hasta 8 contactos vencidos, de hoy o de los próximos 7 días.</p>
             {errorAgenda && <p role="alert" className="mt-3 text-sm text-red-700">{errorAgenda}</p>}
             {cargandoListas ? <p className="mt-4 text-sm text-slate-500">Cargando agenda…</p> :
