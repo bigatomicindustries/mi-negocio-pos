@@ -224,6 +224,7 @@ export default function TableroComercialPage() {
     { label: "Prospectos totales", value: total, color: "text-slate-900" },
     { label: "Convertidos", value: convertidos, color: "text-green-700" },
     { label: "Conversión actual", value: conversion, color: "text-green-700" },
+    { label: "Seguimientos pendientes", value: (resumen?.vencidos ?? 0) + (resumen?.hoy ?? 0), color: "text-amber-700" },
     { label: "Alta prioridad · abiertos", value: resumen?.alta ?? 0, color: "text-red-700" },
   ];
   const agendaKpis = [
@@ -254,7 +255,7 @@ export default function TableroComercialPage() {
         </header>
 
         {errorResumen && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{errorResumen}</p>}
-        <section aria-label="Indicadores comerciales" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section aria-label="Indicadores comerciales" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {kpis.map(kpi => (
             <div key={kpi.label} className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="text-sm text-slate-500">{kpi.label}</p>
