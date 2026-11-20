@@ -323,7 +323,7 @@ export default function ProspectosPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <nav aria-label="Navegación comercial" className="flex flex-wrap gap-5 text-sm font-semibold">
           <Link href="/superadmin" className="text-green-700 hover:underline">← Negocios</Link>
-          <Link href="/superadmin/tablero" className="text-green-700 hover:underline">Tablero comercial · CRM 1.2 →</Link>
+          <Link href="/superadmin/tablero" className="text-green-700 hover:underline">Tablero comercial · CRM 1.3 →</Link>
         </nav>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
