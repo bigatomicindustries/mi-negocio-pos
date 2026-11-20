@@ -292,10 +292,13 @@ export default function ProspectosPage() {
     setActivitiesError("");
     setActivityNotice("");
     try {
-      const payload = selected.fuente === "demo"
-        ? { demo_request_id: selected.id, tipo: activityType, detalle: detail }
-        : { lead_id: selected.id, tipo: activityType, detalle: detail };
-      const { error: err } = await supabase.from("crm_actividades").insert(payload);
+      const { error: err } = selected.fuente === "demo"
+        ? await supabase.from("crm_actividades").insert({
+            demo_request_id: selected.id, tipo: activityType, detalle: detail,
+          })
+        : await supabase.from("crm_actividades").insert({
+            lead_id: selected.id, tipo: activityType, detalle: detail,
+          });
       if (err) { setActivitiesError(err.message); return; }
       setActivityText("");
       setActivityNotice("Actividad registrada en el historial.");
