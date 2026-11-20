@@ -138,8 +138,9 @@ console.error(
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-12">
       <div className="mx-auto max-w-6xl">
-        {esPlatformAdmin && <div className="mb-6 flex justify-end">
-          <Link href="/superadmin/prospectos" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800">Prospectos · CRM →</Link>
+        {esPlatformAdmin && <div className="mb-6 flex flex-wrap justify-end gap-3">
+          <Link href="/superadmin/tablero" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800">Tablero comercial · CRM 1.2 →</Link>
+          <Link href="/superadmin/prospectos" className="rounded-xl border border-green-700 bg-white px-5 py-3 text-sm font-semibold text-green-700 hover:bg-green-50">Prospectos · Seguimiento →</Link>
         </div>}
 
         <div>
