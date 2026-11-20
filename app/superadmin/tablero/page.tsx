@@ -18,6 +18,10 @@ const etapas = [
 type Estado = (typeof etapas)[number]["key"];
 type Fuente = "demo" | "lead";
 type Prioridad = "baja" | "media" | "alta";
+type Periodo = "7d" | "30d" | "90d" | "all";
+type FiltroFuente = "todas" | Fuente;
+type PuntoTendencia = { etiqueta: string; desde: string; hasta: string; cantidad: number };
+type ResumenFuente = { fuente: Fuente; total: number; convertidos: number };
 
 type Resumen = {
   total: number;
@@ -49,6 +53,11 @@ type Actividad = {
 };
 
 const timezone = "America/Mexico_City";
+const opcionesPeriodo: { value: Periodo; label: string }[] = [
+  { value: "7d", label: "7 días" }, { value: "30d", label: "30 días" },
+  { value: "90d", label: "90 días" }, { value: "all", label: "Histórico" },
+];
+const nombresFuente: Record<Fuente, string> = { demo: "Solicitud rápida", lead: "Formulario completo" };
 const estadosAbiertos = ["nuevo", "contactado", "demo_agendada", "en_negociacion"];
 const nombresActividad: Record<string, string> = {
   llamada: "Llamada", whatsapp: "WhatsApp", correo: "Correo",
@@ -75,6 +84,54 @@ function fechaCorta(fecha: string) {
   });
 }
 
+function fechaMini(fecha: string) {
+  return new Date(fecha + "T12:00:00Z").toLocaleDateString("es-MX", {
+    timeZone: timezone, day: "numeric", month: "short",
+  });
+}
+
+// Ciudad de México no observa horario de verano desde 2022. El corte es medianoche local.
+function inicioDiaMexico(fecha: string) {
+  return fecha + "T00:00:00-06:00";
+}
+
+function inicioPeriodo(periodo: Periodo, hoy: string) {
+  if (periodo === "all") return null;
+  const dias = periodo === "7d" ? 7 : periodo === "30d" ? 30 : 90;
+  return sumarDias(hoy, -(dias - 1));
+}
+
+function construirIntervalos(periodo: Periodo, hoy: string): PuntoTendencia[] {
+  if (periodo === "all") {
+    return Array.from({ length: 6 }, (_, i) => {
+      const mes = new Date(hoy + "T12:00:00Z");
+      mes.setUTCDate(1);
+      mes.setUTCMonth(mes.getUTCMonth() - (5 - i));
+      const desde = mes.toISOString().slice(0, 10);
+      const etiqueta = mes.toLocaleDateString("es-MX", { timeZone: "UTC", month: "short" });
+      mes.setUTCMonth(mes.getUTCMonth() + 1);
+      const hasta = i === 5 ? hoy : sumarDias(mes.toISOString().slice(0, 10), -1);
+      return { etiqueta, desde, hasta, cantidad: 0 };
+    });
+  }
+  const dias = periodo === "7d" ? 7 : periodo === "30d" ? 30 : 90;
+  const paso = periodo === "7d" ? 1 : periodo === "30d" ? 5 : 15;
+  const comienzo = sumarDias(hoy, -(dias - 1));
+  return Array.from({ length: dias / paso }, (_, i) => {
+    const desde = sumarDias(comienzo, i * paso);
+    const hasta = sumarDias(desde, paso - 1);
+    return { etiqueta: fechaMini(desde), desde, hasta, cantidad: 0 };
+  });
+}
+
+function porcentaje(parte: number, total: number) {
+  return total > 0 ? ((parte / total) * 100).toFixed(1) + "%" : "0%";
+}
+
+function celdaCsv(valor: string | number) {
+  return '"' + String(valor).replace(/"/g, '""') + '"';
+}
+
 function fechaHora(fecha: string) {
   return new Date(fecha).toLocaleString("es-MX", {
     timeZone: timezone, dateStyle: "medium", timeStyle: "short",
@@ -96,6 +153,12 @@ export default function TableroComercialPage() {
   const { cargando: authLoading, esPlatformAdmin } = useAuth();
   const [hoy, setHoy] = useState(hoyMexico);
   const [revision, setRevision] = useState(0);
+  const [periodo, setPeriodo] = useState<Periodo>("30d");
+  const [fuente, setFuente] = useState<FiltroFuente>("todas");
+  const [serie, setSerie] = useState<PuntoTendencia[]>([]);
+  const [fuentesResumen, setFuentesResumen] = useState<ResumenFuente[]>([]);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
+  const [mensajeReporte, setMensajeReporte] = useState("");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargandoResumen, setCargandoResumen] = useState(true);
   const [errorResumen, setErrorResumen] = useState("");
@@ -122,20 +185,48 @@ export default function TableroComercialPage() {
     async function cargarResumen() {
       setCargandoResumen(true);
       setErrorResumen("");
-      const base = () => supabase.from("crm_prospectos").select("id", { count: "exact", head: true });
-      const fin = sumarDias(hoy, 7);
+      const inicio = inicioPeriodo(periodo, hoy);
+      const corte = inicioDiaMexico(sumarDias(hoy, 1));
+      const basePeriodo = () => {
+        let q = supabase.from("crm_prospectos")
+          .select("id", { count: "exact", head: true })
+          .lt("created_at", corte);
+        if (inicio) q = q.gte("created_at", inicioDiaMexico(inicio));
+        return q;
+      };
+      const base = () => {
+        let q = basePeriodo();
+        if (fuente !== "todas") q = q.eq("fuente", fuente);
+        return q;
+      };
+      const baseAgenda = () => {
+        let q = supabase.from("crm_prospectos")
+          .select("id", { count: "exact", head: true })
+          .in("estado", estadosAbiertos);
+        if (fuente !== "todas") q = q.eq("fuente", fuente);
+        return q;
+      };
+      const intervalos = construirIntervalos(periodo, hoy);
       const respuestas = await Promise.all([
         base(),
         ...etapas.map(etapa => base().eq("estado", etapa.key)),
-        base().in("estado", estadosAbiertos).lt("crm_proximo_contacto", hoy),
-        base().in("estado", estadosAbiertos).eq("crm_proximo_contacto", hoy),
-        base().in("estado", estadosAbiertos).gt("crm_proximo_contacto", hoy).lte("crm_proximo_contacto", fin),
-        base().in("estado", estadosAbiertos).is("crm_proximo_contacto", null),
-        base().in("estado", estadosAbiertos).eq("crm_prioridad", "alta"),
+        baseAgenda().lt("crm_proximo_contacto", hoy),
+        baseAgenda().eq("crm_proximo_contacto", hoy),
+        baseAgenda().gt("crm_proximo_contacto", hoy).lte("crm_proximo_contacto", sumarDias(hoy, 7)),
+        baseAgenda().is("crm_proximo_contacto", null),
+        baseAgenda().eq("crm_prioridad", "alta"),
+        basePeriodo().eq("fuente", "demo"),
+        basePeriodo().eq("fuente", "demo").eq("estado", "convertido"),
+        basePeriodo().eq("fuente", "lead"),
+        basePeriodo().eq("fuente", "lead").eq("estado", "convertido"),
+        ...intervalos.map(p => base().gte("created_at", inicioDiaMexico(p.desde))
+          .lt("created_at", inicioDiaMexico(sumarDias(p.hasta, 1)))),
       ]);
       if (cancelled) return;
       if (respuestas.some(respuesta => respuesta.error)) {
         setResumen(null);
+        setSerie([]);
+        setFuentesResumen([]);
         setErrorResumen("No se pudieron calcular los indicadores. Intenta actualizar.");
       } else {
         const cantidades = respuestas.map(respuesta => respuesta.count ?? 0);
@@ -149,12 +240,18 @@ export default function TableroComercialPage() {
           sinFecha: cantidades[10],
           alta: cantidades[11],
         });
+        setFuentesResumen([
+          { fuente: "demo", total: cantidades[12], convertidos: cantidades[13] },
+          { fuente: "lead", total: cantidades[14], convertidos: cantidades[15] },
+        ]);
+        setSerie(intervalos.map((p, i) => ({ ...p, cantidad: cantidades[16 + i] })));
+        setUltimaActualizacion(new Date());
       }
       setCargandoResumen(false);
     }
     void cargarResumen();
     return () => { cancelled = true; };
-  }, [authLoading, esPlatformAdmin, hoy, revision]);
+  }, [authLoading, esPlatformAdmin, hoy, periodo, fuente, revision]);
 
   useEffect(() => {
     if (authLoading || !esPlatformAdmin) return;
@@ -165,16 +262,21 @@ export default function TableroComercialPage() {
       setErrorAgenda("");
       setErrorActividades("");
       const [agendaResult, actividadResult] = await Promise.all([
-        supabase.from("crm_prospectos")
-          .select("id,fuente,nombre,negocio,estado,crm_prioridad,crm_proximo_contacto")
-          .in("estado", estadosAbiertos)
-          .lte("crm_proximo_contacto", sumarDias(hoy, 7))
-          .order("crm_proximo_contacto", { ascending: true })
-          .limit(8),
-        supabase.from("crm_actividades")
-          .select("id,tipo,detalle,created_at,demo_request_id,lead_id")
-          .order("created_at", { ascending: false })
-          .limit(8),
+        (() => {
+          let q = supabase.from("crm_prospectos")
+            .select("id,fuente,nombre,negocio,estado,crm_prioridad,crm_proximo_contacto")
+            .in("estado", estadosAbiertos)
+            .lte("crm_proximo_contacto", sumarDias(hoy, 7));
+          if (fuente !== "todas") q = q.eq("fuente", fuente);
+          return q.order("crm_proximo_contacto", { ascending: true }).limit(8);
+        })(),
+        (() => {
+          let q = supabase.from("crm_actividades")
+            .select("id,tipo,detalle,created_at,demo_request_id,lead_id");
+          if (fuente === "demo") q = q.not("demo_request_id", "is", null);
+          if (fuente === "lead") q = q.not("lead_id", "is", null);
+          return q.order("created_at", { ascending: false }).limit(8);
+        })(),
       ]);
       if (cancelled) return;
       if (agendaResult.error) {
@@ -212,7 +314,7 @@ export default function TableroComercialPage() {
     }
     void cargarListas();
     return () => { cancelled = true; };
-  }, [authLoading, esPlatformAdmin, hoy, revision]);
+  }, [authLoading, esPlatformAdmin, hoy, fuente, revision]);
 
   if (authLoading || !esPlatformAdmin) return null;
 
