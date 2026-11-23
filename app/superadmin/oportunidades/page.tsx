@@ -34,6 +34,11 @@ export default function OportunidadesPage(){
  const [showCreate,setShowCreate]=useState(false);
  const [editingId,setEditingId]=useState<string|null>(null);
  const [editStage,setEditStage]=useState<Stage>("nuevo");
+ const [original,setOriginal]=useState("");
+ const [formError,setFormError]=useState("");
+ const snapshot=(t:string,id:string,v:string,d:string,n:string,s:Stage)=>JSON.stringify({title:t.trim(),contactId:id,value:Number(v),closeDate:d,notes:n.trim(),stage:s});
+ const dirty=showCreate&&snapshot(title,contactId,value,closeDate,notes,editStage)!==original;
+ const closeForm=()=>{if(saving)return;if(dirty&&!window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?"))return;setShowCreate(false);setFormError("");};
  const modalRef=useRef<HTMLDivElement>(null);
  const openButtonRef=useRef<HTMLButtonElement>(null);
  const load=useCallback(async()=>{
@@ -48,24 +53,24 @@ export default function OportunidadesPage(){
  },[]);
  useEffect(()=>{if(!cargando&&!esPlatformAdmin)router.replace("/superadmin");},[cargando,esPlatformAdmin,router]);
  useEffect(()=>{if(!cargando&&esPlatformAdmin)void load();},[cargando,esPlatformAdmin,load]);
- useEffect(()=>{if(!showCreate)return;const previous=document.body.style.overflow;document.body.style.overflow="hidden";const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape"&&!saving)setShowCreate(false);if(e.key==="Tab"&&modalRef.current){const focusable=Array.from(modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])"));if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener("keydown",onKey);modalRef.current?.querySelector<HTMLElement>("select")?.focus();return()=>{document.body.style.overflow=previous;document.removeEventListener("keydown",onKey);openButtonRef.current?.focus();};},[showCreate,saving]);
+ useEffect(()=>{if(!showCreate)return;const previous=document.body.style.overflow;document.body.style.overflow="hidden";const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")closeForm();if(e.key==="Tab"&&modalRef.current){const focusable=Array.from(modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])"));if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener("keydown",onKey);modalRef.current?.querySelector<HTMLElement>("select")?.focus();return()=>{document.body.style.overflow=previous;document.removeEventListener("keydown",onKey);openButtonRef.current?.focus();};},[showCreate,saving]);
  const normalize=(s:string)=>s.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("es-MX");
  useEffect(()=>{const id=new URLSearchParams(window.location.search).get("ver_contacto");if(id)setFilterContactId(id);},[]);
- useEffect(()=>{if(loading||!contacts.length)return;const id=new URLSearchParams(window.location.search).get("contacto");if(!id)return;const found=contacts.some(c=>c.id===id);if(found){setContactId(id);setShowCreate(true);}else setError("El contacto solicitado no está disponible o está archivado.");window.history.replaceState(null,"",window.location.pathname);},[loading,contacts]);
+ useEffect(()=>{if(loading||!contacts.length)return;const id=new URLSearchParams(window.location.search).get("contacto");if(!id)return;const found=contacts.some(c=>c.id===id);if(found){setContactId(id);setOriginal(snapshot("",id,"0","","","nuevo"));setEditingId(null);setShowCreate(true);}else setError("El contacto solicitado no está disponible o está archivado.");window.history.replaceState(null,"",window.location.pathname);},[loading,contacts]);
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre":"Contacto no disponible";};
  async function create(e:React.FormEvent<HTMLFormElement>){
-  e.preventDefault();if(saving)return;
+  e.preventDefault();if(saving||editingId&&!dirty)return;
   const amount=Number(value);
-  if(!title.trim()||!contactId||!Number.isFinite(amount)||amount<0){setError("Completa el contacto, título e importe válido.");return;}
-  setSaving(true);setError("");setNotice("");
+  if(!title.trim()||!contactId||!Number.isFinite(amount)||amount<0){setFormError("Completa el contacto, título e importe válido.");return;}
+  setSaving(true);setFormError("");setError("");setNotice("");
   const {data:{user},error:authError}=await supabase.auth.getUser();
-  if(authError||!user){setError("Tu sesión expiró. Vuelve a iniciar sesión.");setSaving(false);return;}
+  if(authError||!user){setFormError("Tu sesión expiró. Vuelve a iniciar sesión.");setSaving(false);return;}
   const payload={contacto_id:contactId,titulo:title.trim(),valor_estimado:amount,fecha_cierre_estimada:closeDate||null,notas:notes.trim()||null};
   const {error:saveError}=editingId
    ? await supabase.from("crm_oportunidades").update({...payload,etapa:editStage,updated_at:new Date().toISOString()}).eq("id",editingId)
    : await supabase.from("crm_oportunidades").insert({...payload,created_by:user.id});
-  if(saveError)setError(saveError.message);
-  else {setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setNotice(editingId?"Oportunidad actualizada.":"Oportunidad creada.");setShowCreate(false);setEditingId(null);await load();}
+  if(saveError)setFormError("No se pudieron guardar los cambios: "+saveError.message);
+  else {setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setNotice(editingId?"Oportunidad actualizada.":"Oportunidad creada.");setShowCreate(false);setEditingId(null);setFormError("");await load();}
   setSaving(false);
  }
  async function changeStage(row:Opportunity,stage:Stage){
@@ -77,11 +82,11 @@ export default function OportunidadesPage(){
   setMovingId(null);
  }
  function openEdit(row:Opportunity){
-  setError("");setNotice("");setEditingId(row.id);setTitle(row.titulo);setContactId(row.contacto_id);
-  setValue(String(row.valor_estimado));setCloseDate(row.fecha_cierre_estimada||"");setNotes(row.notas||"");setEditStage(row.etapa);setShowCreate(true);
+  setError("");setNotice("");setFormError("");setEditingId(row.id);setTitle(row.titulo);setContactId(row.contacto_id);
+  setValue(String(row.valor_estimado));setCloseDate(row.fecha_cierre_estimada||"");setNotes(row.notas||"");setEditStage(row.etapa);setOriginal(snapshot(row.titulo,row.contacto_id,String(row.valor_estimado),row.fecha_cierre_estimada||"",row.notas||"",row.etapa));setShowCreate(true);
  }
  function openNew(){
-  setError("");setEditingId(null);setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setEditStage("nuevo");setShowCreate(true);
+  setError("");setFormError("");setEditingId(null);setOriginal(snapshot("","","0","","","nuevo"));setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setEditStage("nuevo");setShowCreate(true);
  }
  function dropOn(stage:Stage){
   const row=rows.find(x=>x.id===dragId);
@@ -110,13 +115,13 @@ export default function OportunidadesPage(){
     </label>
     <button ref={openButtonRef} type="button" onClick={openNew} className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">+ Nueva oportunidad</button>
    </section>
-   {showCreate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 sm:p-6" onMouseDown={e=>{if(e.target===e.currentTarget&&!saving)setShowCreate(false);}}>
+   {showCreate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 sm:p-6" onMouseDown={e=>{if(e.target===e.currentTarget)closeForm();}}>
     <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="create-opportunity-title" className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7">
      <div className="mb-5 flex items-center justify-between gap-3">
       <h2 id="create-opportunity-title" className="text-xl font-bold">{editingId?"Editar oportunidad":"Nueva oportunidad"}</h2>
-      <button type="button" onClick={()=>setShowCreate(false)} disabled={saving} aria-label="Cerrar formulario" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50">✕</button>
+      <button type="button" onClick={closeForm} disabled={saving} aria-label="Cerrar formulario" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50">✕</button>
      </div>
-     {error&&<p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+     {formError&&<p role="alert" className="sticky top-0 z-10 mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
     <form onSubmit={create} className="grid gap-4 sm:grid-cols-2">
      <label className="text-sm font-medium">Contacto existente<select className={inputStyle+" mt-1"} value={contactId} onChange={e=>setContactId(e.target.value)} required><option value="">Selecciona un contacto</option>{contacts.map(c=><option key={c.id} value={c.id}>{[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre"}{c.empresa&&c.nombre?" · "+c.empresa:""}</option>)}</select></label>
      <label className="text-sm font-medium">Nombre de oportunidad<input className={inputStyle+" mt-1"} value={title} onChange={e=>setTitle(e.target.value)} maxLength={180} required placeholder="Ej. Suscripción anual"/></label>
@@ -124,7 +129,7 @@ export default function OportunidadesPage(){
      <label className="text-sm font-medium">Cierre estimado<input className={inputStyle+" mt-1"} type="date" value={closeDate} onChange={e=>setCloseDate(e.target.value)}/></label>
      {editingId&&<label className="text-sm font-medium">Etapa<select className={inputStyle+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(s=><option key={s} value={s}>{names[s]}</option>)}</select></label>}
      <label className="text-sm font-medium sm:col-span-2">Notas<input className={inputStyle+" mt-1"} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Detalles relevantes"/></label>
-     <button type="button" onClick={()=>setShowCreate(false)} disabled={saving} className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="submit" disabled={saving||!contacts.length} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":editingId?"Guardar cambios":"+ Crear oportunidad"}</button>
+     <button type="button" onClick={closeForm} disabled={saving} className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="submit" disabled={saving||!contacts.length||(!!editingId&&!dirty)} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":editingId?"Guardar cambios":"+ Crear oportunidad"}</button>
     </form>
     </div>
    </div>}
