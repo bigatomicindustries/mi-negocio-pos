@@ -72,6 +72,8 @@ export default function ContactosPage() {
   const [page, setPage] = useState(0);
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<"resumen" | "datos" | "actividad">("resumen");
+  const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Contacto | null>(null);
   const [form, setForm] = useState<Form>(empty);
   const [originalForm, setOriginalForm] = useState<Form>(empty);
@@ -134,6 +136,8 @@ export default function ContactosPage() {
 
   function open(c: Contacto | null) {
     setSelected(c);
+    setTab(c ? "resumen" : "datos");
+    setEditMode(!c);
     const correos = c?.crm_contacto_medios.filter(m => m.tipo === "correo")
       .sort((a, b) => Number(b.es_principal) - Number(a.es_principal)).map(m => m.valor) ?? [];
     const telefonos = c?.crm_contacto_medios.filter(m => m.tipo === "telefono")
@@ -156,6 +160,7 @@ export default function ContactosPage() {
     if (saving) return;
     if (hasChanges && !window.confirm("¿Descartar los cambios sin guardar?")) return;
     setEditing(false);
+    setEditMode(false);
     setMatches([]); setFormError("");
   }
   function validate() {
@@ -230,7 +235,7 @@ export default function ContactosPage() {
         throw new Error(err.message);
       }
       if (!data) throw new Error("No se pudo guardar el contacto.");
-      setEditing(false); setMatches([]);
+      setEditing(false); setEditMode(false); setMatches([]);
       setNotice(selected ? "Contacto actualizado." : "Contacto creado.");
       reload();
     } catch (err) {
@@ -363,11 +368,11 @@ export default function ContactosPage() {
         </section>
         <CrmModal
           open={editing}
-          title={selected ? "Editar contacto" : "Nuevo contacto"}
-          description="Ficha de contacto · Directorio interno"
+          title={selected ? nombre(selected) : "Nuevo contacto"}
+          description={selected ? (selected.empresa || "Contacto") + " · Ficha comercial" : "Ficha de contacto · Directorio interno"}
           onClose={cancelEditing}
-          closeLabel={hasChanges ? "Cancelar" : "Cerrar"}
-          actions={hasChanges ? <button
+          closeLabel={editMode ? "Cancelar" : "Cerrar"}
+          actions={editMode && hasChanges ? <button
             type="button"
             disabled={saving || matches.length > 0}
             onClick={() => void save()}
@@ -388,12 +393,25 @@ export default function ContactosPage() {
             </div>
           ) : undefined}
         >
-          {selected && <ContactCommercialSummary key={"commercial:"+selected.id} contactId={selected.id} warnUnsaved={hasChanges} />}
-          {selected && <ContactProspects key={selected.id} contactId={selected.id} warnUnsaved={hasChanges} />}
+          {selected && <div role="tablist" aria-label="Secciones de la ficha" className="sticky top-0 z-10 flex flex-wrap gap-2 border-b border-slate-200 bg-white pb-3">
+            {([["resumen","Resumen"],["datos","Datos"],["actividad","Actividad"]] as const).map(([id,label]) =>
+              <button key={id} type="button" role="tab" aria-selected={tab===id} onClick={()=>{if(editMode&&hasChanges&&!window.confirm("¿Descartar los cambios sin guardar?"))return;if(editMode&&hasChanges){setForm(originalForm);setMatches([]);setFormError("");}setEditMode(false);setTab(id);}}
+                className={"rounded-lg px-4 py-2 text-sm font-semibold transition "+(tab===id?"bg-emerald-700 text-white":"bg-slate-100 text-slate-700 hover:bg-slate-200")}>{label}</button>)}
+          </div>}
+          {selected && tab==="resumen" && <>
+            <ContactCommercialSummary key={"commercial:"+selected.id} contactId={selected.id} />
+            <ContactProspects key={selected.id} contactId={selected.id} />
+          </>}
+          {selected && tab==="actividad" && <ContactCommercialSummary key={"activity:"+selected.id} contactId={selected.id} mode="activity" />}
+          {(!selected || tab==="datos") && <>
+            {selected && <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">{editMode?"Editando datos del contacto":"Consulta de datos del contacto"}</p>
+              {!editMode && <button type="button" className={btn} onClick={()=>setEditMode(true)}>Editar datos</button>}
+            </div>}
           <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
               {key === "nombre" ? "Nombre" : key === "apellido" ? "Apellido" : "Empresa o tienda"}
-              <input value={form[key]} maxLength={key === "empresa" ? 180 : 120} onChange={e => update(key, e.target.value)} className={field} />
+              <input value={form[key]} maxLength={key === "empresa" ? 180 : 120} onChange={e => update(key, e.target.value)} disabled={!editMode || saving} className={field + (!editMode ? " bg-slate-50 text-slate-700" : "")} />
             </label>)}
             <div className="text-sm text-slate-500 sm:self-end">Se requiere un nombre o una empresa.</div>
             <div className="space-y-2">
@@ -401,16 +419,16 @@ export default function ContactosPage() {
               {form.correos.map((valor, index) => <div key={index} className="flex items-center gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="sr-only">{index === 0 ? "Correo principal" : `Correo ${index + 1}`}</span>
-                  <input type="email" value={valor} maxLength={320} disabled={saving}
+                  <input type="email" value={valor} maxLength={320} disabled={!editMode || saving}
                     onChange={e => update("correos", form.correos.map((v, i) => i === index ? e.target.value : v))}
-                    className={field + " mt-0"} placeholder="contacto@empresa.com" />
+                    className={field + " mt-0" + (!editMode ? " bg-slate-50 text-slate-700" : "")} placeholder="contacto@empresa.com" />
                 </label>
-                {form.correos.length > 1 && <button type="button" disabled={saving}
+                {form.correos.length > 1 && <button type="button" disabled={!editMode || saving}
                   aria-label={`Quitar correo ${index + 1}`}
                   onClick={() => update("correos", form.correos.filter((_, i) => i !== index))}
                   className={btn}>Quitar</button>}
               </div>)}
-              <button type="button" disabled={saving || form.correos.length >= 10} onClick={() => update("correos", [...form.correos, ""])}
+              <button type="button" disabled={!editMode || saving || form.correos.length >= 10} onClick={() => update("correos", [...form.correos, ""])}
                 className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar correo</button>
               <p className="text-xs text-slate-500">El primer correo ingresado será el principal.</p>
             </div>
@@ -419,30 +437,32 @@ export default function ContactosPage() {
               {form.telefonos.map((valor, index) => <div key={index} className="flex items-center gap-2">
                 <label className="min-w-0 flex-1">
                   <span className="sr-only">{index === 0 ? "Teléfono principal" : `Teléfono ${index + 1}`}</span>
-                  <input type="tel" inputMode="tel" value={valor} maxLength={32} disabled={saving}
+                  <input type="tel" inputMode="tel" value={valor} maxLength={32} disabled={!editMode || saving}
                     onChange={e => update("telefonos", form.telefonos.map((v, i) => i === index ? e.target.value : v))}
-                    className={field + " mt-0"} placeholder="55 1234 5678" />
+                    className={field + " mt-0" + (!editMode ? " bg-slate-50 text-slate-700" : "")} placeholder="55 1234 5678" />
                 </label>
-                {form.telefonos.length > 1 && <button type="button" disabled={saving}
+                {form.telefonos.length > 1 && <button type="button" disabled={!editMode || saving}
                   aria-label={`Quitar teléfono ${index + 1}`}
                   onClick={() => update("telefonos", form.telefonos.filter((_, i) => i !== index))}
                   className={btn}>Quitar</button>}
               </div>)}
-              <button type="button" disabled={saving || form.telefonos.length >= 10} onClick={() => update("telefonos", [...form.telefonos, ""])}
+              <button type="button" disabled={!editMode || saving || form.telefonos.length >= 10} onClick={() => update("telefonos", [...form.telefonos, ""])}
                 className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar teléfono</button>
               <p className="text-xs text-slate-500">El primer teléfono ingresado será el principal. Puedes incluir la clave de país.</p>
             </div>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Dirección (opcional)
               <textarea value={form.direccion} onChange={e => update("direccion", e.target.value)}
-                rows={3} maxLength={2000} disabled={saving} className={field}
+                rows={3} maxLength={2000} disabled={!editMode || saving} disabled={!editMode || saving} className={field + (!editMode ? " bg-slate-50 text-slate-700" : "")}
                 placeholder="Escribe la dirección completa o las referencias que necesites, sin separar campos." />
               <span className="text-xs font-normal text-slate-500">Texto libre: calle, colonia, ciudad y referencias, como prefieras.</span>
             </label>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Notas internas
-              <textarea value={form.notas} onChange={e => update("notas", e.target.value)} rows={3} maxLength={4000} className={field} />
+              <textarea value={form.notas} onChange={e => update("notas", e.target.value)} rows={3} maxLength={4000} disabled={!editMode || saving} className={field + (!editMode ? " bg-slate-50 text-slate-700" : "")} />
             </label>
           </div>
-          <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
+
+          </>}
+          {(!selected || tab==="datos") && <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno, búsqueda global, CSV y vinculación con prospectos. Sin importación ni integraciones externas.</p>
       </div>
