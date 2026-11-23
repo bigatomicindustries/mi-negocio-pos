@@ -11,6 +11,7 @@ type CrmModalProps = {
   onClose: () => void;
   closeLabel?: string;
   actions?: ReactNode;
+  alert?: ReactNode;
   busy?: boolean;
   size?: "md" | "lg";
 };
@@ -23,7 +24,7 @@ const focusableSelector =
  * limita el foco al diálogo y evita el desplazamiento del fondo.
  */
 export default function CrmModal({
-  open, title, description, children, onClose, closeLabel = "Cerrar", actions, busy = false, size = "md",
+  open, title, description, children, onClose, closeLabel = "Cerrar", actions, alert, busy = false, size = "md",
 }: CrmModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -122,6 +123,11 @@ export default function CrmModal({
             </button>
           </div>
         </header>
+        {alert && (
+          <div role="alert" className="max-h-[32dvh] shrink-0 overflow-y-auto border-b border-slate-200 px-5 py-3 sm:px-7">
+            {alert}
+          </div>
+        )}
         <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
           {children}
         </div>
