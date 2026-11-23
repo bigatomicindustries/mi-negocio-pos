@@ -349,6 +349,7 @@ export default function ContactosPage() {
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => open(c)} className={btn}>Ver / editar</button>
+                  {!archived && <Link href={`/superadmin/oportunidades?contacto=${encodeURIComponent(c.id)}`} className={btn}>+ Oportunidad</Link>}
                   <button type="button" disabled={saving} onClick={() => void setArchive(c, !archived)} className={btn}>{archived ? "Recuperar" : "Archivar"}</button>
                 </div>
               </article>;
