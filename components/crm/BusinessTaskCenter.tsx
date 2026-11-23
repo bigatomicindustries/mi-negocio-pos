@@ -4,8 +4,8 @@ type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;complet
 type Opportunity={id:string;titulo:string};
 type Filter="pendientes"|"vencidas"|"proximas"|"completadas"|"todas";
 const input="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
-export default function BusinessTaskCenter({tasks,opportunities,saving,taskTitle,setTaskTitle,taskDue,setTaskDue,taskOpp,setTaskOpp,onCreate,onToggle}:{tasks:Task[];opportunities:Opportunity[];saving:boolean;taskTitle:string;setTaskTitle:(s:string)=>void;taskDue:string;setTaskDue:(s:string)=>void;taskOpp:string;setTaskOpp:(s:string)=>void;onCreate:(e:React.FormEvent)=>void;onToggle:(t:Task)=>void}){
- const [filter,setFilter]=useState<Filter>("pendientes"),[search,setSearch]=useState("");
+export default function BusinessTaskCenter({tasks,opportunities,initialFilter,saving,taskTitle,setTaskTitle,taskDue,setTaskDue,taskOpp,setTaskOpp,onCreate,onToggle}: {tasks:Task[];opportunities:Opportunity[];initialFilter?:string|null;saving:boolean;taskTitle:string;setTaskTitle:(s:string)=>void;taskDue:string;setTaskDue:(s:string)=>void;taskOpp:string;setTaskOpp:(s:string)=>void;onCreate:(e:React.FormEvent)=>void;onToggle:(t:Task)=>void}){
+ const [filter,setFilter]=useState<Filter>(initialFilter==="vencidas"||initialFilter==="proximas"?initialFilter:"pendientes"),[search,setSearch]=useState("");
  const now=Date.now(),week=now+7*86400000;
  const valid=tasks.filter(t=>opportunities.some(o=>o.id===t.oportunidad_id));
  const counts={pendientes:valid.filter(t=>!t.completada_at).length,vencidas:valid.filter(t=>!t.completada_at&&new Date(t.vence_at).getTime()<now).length,proximas:valid.filter(t=>!t.completada_at&&new Date(t.vence_at).getTime()>=now&&new Date(t.vence_at).getTime()<=week).length,completadas:valid.filter(t=>!!t.completada_at).length,todas:valid.length};
