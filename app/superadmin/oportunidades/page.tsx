@@ -30,6 +30,7 @@ export default function OportunidadesPage(){
  const [closeDate,setCloseDate]=useState("");
  const [notes,setNotes]=useState("");
  const [search,setSearch]=useState("");
+ const [filterContactId,setFilterContactId]=useState("");
  const [showCreate,setShowCreate]=useState(false);
  const modalRef=useRef<HTMLDivElement>(null);
  const openButtonRef=useRef<HTMLButtonElement>(null);
