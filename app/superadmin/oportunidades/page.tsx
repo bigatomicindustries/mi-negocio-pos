@@ -1,0 +1,108 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
+
+const stages = ["nuevo", "contactado", "propuesta", "negociacion", "ganado", "perdido"] as const;
+type Stage = typeof stages[number];
+const names: Record<Stage,string> = {nuevo:"Nuevo",contactado:"Contactado",propuesta:"Propuesta",negociacion:"Negociación",ganado:"Ganado",perdido:"Perdido"};
+type Contact = {id:string; nombre:string|null; apellido:string|null; empresa:string|null};
+type Opportunity = {id:string;contacto_id:string;titulo:string;etapa:Stage;valor_estimado:number;fecha_cierre_estimada:string|null;notas:string|null};
+const inputStyle="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none";
+const money=(value:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(value);
+export default function OportunidadesPage(){
+ const router=useRouter();
+ const {cargando,esPlatformAdmin}=useAuth();
+ const [contacts,setContacts]=useState<Contact[]>([]);
+ const [rows,setRows]=useState<Opportunity[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [saving,setSaving]=useState(false);
+ const [error,setError]=useState("");
+ const [notice,setNotice]=useState("");
+ const [title,setTitle]=useState("");
+ const [contactId,setContactId]=useState("");
+ const [value,setValue]=useState("0");
+ const [closeDate,setCloseDate]=useState("");
+ const [notes,setNotes]=useState("");
+ const load=useCallback(async()=>{
+  setLoading(true);setError("");
+  const [op,co]=await Promise.all([
+   supabase.from("crm_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,fecha_cierre_estimada,notas").order("created_at",{ascending:false}).limit(500),
+   supabase.from("crm_contactos").select("id,nombre,apellido,empresa").eq("ambito","plataforma").is("archivado_at",null).order("nombre").limit(1000)
+  ]);
+  if(op.error||co.error)setError(op.error?.message||co.error?.message||"Error al consultar el CRM");
+  else {setRows((op.data||[]) as Opportunity[]);setContacts((co.data||[]) as Contact[]);}
+  setLoading(false);
+ },[]);
+ useEffect(()=>{if(!cargando&&!esPlatformAdmin)router.replace("/superadmin");},[cargando,esPlatformAdmin,router]);
+ useEffect(()=>{if(!cargando&&esPlatformAdmin)void load();},[cargando,esPlatformAdmin,load]);
+ const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre":"Contacto no disponible";};
+ async function create(e:React.FormEvent<HTMLFormElement>){
+  e.preventDefault();if(saving)return;
+  const amount=Number(value);
+  if(!title.trim()||!contactId||!Number.isFinite(amount)||amount<0){setError("Completa el contacto, título e importe válido.");return;}
+  setSaving(true);setError("");setNotice("");
+  const {data:{user},error:authError}=await supabase.auth.getUser();
+  if(authError||!user){setError("Tu sesión expiró. Vuelve a iniciar sesión.");setSaving(false);return;}
+  const {error:saveError}=await supabase.from("crm_oportunidades").insert({contacto_id:contactId,titulo:title.trim(),valor_estimado:amount,fecha_cierre_estimada:closeDate||null,notas:notes.trim()||null,created_by:user.id});
+  if(saveError)setError(saveError.message);
+  else {setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setNotice("Oportunidad creada.");await load();}
+  setSaving(false);
+ }
+ async function changeStage(row:Opportunity,stage:Stage){
+  if(row.etapa===stage)return;
+  setError("");setNotice("");
+  const {error:saveError}=await supabase.from("crm_oportunidades").update({etapa:stage,updated_at:new Date().toISOString()}).eq("id",row.id);
+  if(saveError)setError(saveError.message);else {setRows(current=>current.map(x=>x.id===row.id?{...x,etapa:stage}:x));setNotice("Etapa actualizada.");}
+ }
+ if(cargando||!esPlatformAdmin)return <main className="p-8 text-slate-600">Verificando acceso…</main>;
+ return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
+  <div className="mx-auto max-w-7xl space-y-8">
+   <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
+    <Link href="/superadmin" className="text-slate-600 hover:text-emerald-700">← Administración</Link>
+    <div className="flex flex-wrap items-center justify-center gap-3">
+     <Link href="/superadmin/tablero" className="px-2 py-2 text-emerald-700">CRM</Link>
+     <Link href="/superadmin/prospectos" className="px-2 py-2 text-emerald-700">Prospectos</Link>
+     <Link href="/superadmin/centro-trabajo" className="px-2 py-2 text-emerald-700">Centro de trabajo</Link>
+     <Link href="/superadmin/contactos" className="px-2 py-2 text-emerald-700">Contactos</Link>
+     <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Oportunidades</span>
+    </div><div aria-hidden="true" className="hidden md:block"/>
+   </nav>
+   <header className="rounded-3xl bg-gradient-to-br from-slate-950 to-emerald-950 p-8 text-white">
+    <p className="text-sm font-bold uppercase tracking-widest text-emerald-300">MI NEGOCIO · CRM 1.6 · DEV</p>
+    <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Pipeline de oportunidades</h1>
+    <p className="mt-3 text-slate-200">Gestiona negociaciones vinculadas a tus contactos, desde el primer interés hasta el cierre.</p>
+   </header>
+   {error&&<div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</div>}
+   {notice&&<div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">{notice}</div>}
+   <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <h2 className="mb-4 text-xl font-bold">Nueva oportunidad</h2>
+    <form onSubmit={create} className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+     <label className="text-sm font-medium">Contacto existente<select className={inputStyle+" mt-1"} value={contactId} onChange={e=>setContactId(e.target.value)} required><option value="">Selecciona un contacto</option>{contacts.map(c=><option key={c.id} value={c.id}>{[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre"}{c.empresa&&c.nombre?" · "+c.empresa:""}</option>)}</select></label>
+     <label className="text-sm font-medium">Nombre de oportunidad<input className={inputStyle+" mt-1"} value={title} onChange={e=>setTitle(e.target.value)} maxLength={180} required placeholder="Ej. Suscripción anual"/></label>
+     <label className="text-sm font-medium">Valor estimado (MXN)<input className={inputStyle+" mt-1"} type="number" min="0" step="0.01" value={value} onChange={e=>setValue(e.target.value)} required/></label>
+     <label className="text-sm font-medium">Cierre estimado<input className={inputStyle+" mt-1"} type="date" value={closeDate} onChange={e=>setCloseDate(e.target.value)}/></label>
+     <label className="text-sm font-medium lg:col-span-2">Notas<input className={inputStyle+" mt-1"} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Detalles relevantes"/></label>
+     <button type="submit" disabled={saving||!contacts.length} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":"+ Crear oportunidad"}</button>
+    </form>
+   </section>
+   <section aria-label="Etapas del pipeline" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {stages.map(stage=>{const items=rows.filter(x=>x.etapa===stage);return <div key={stage} className="min-h-44 rounded-2xl border border-slate-200 bg-white p-4">
+     <div className="mb-4 flex items-center justify-between"><h2 className="font-bold">{names[stage]}</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-sm">{items.length}</span></div>
+     <p className="mb-4 text-sm text-slate-500">{money(items.reduce((s,x)=>s+Number(x.valor_estimado),0))}</p>
+     {items.map(row=><article key={row.id} className="mb-3 rounded-xl border border-slate-200 p-4 shadow-sm">
+      <h3 className="font-semibold">{row.titulo}</h3><p className="mt-1 text-sm text-slate-600">{contactName(row.contacto_id)}</p>
+      <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
+      {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
+      {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
+      <label className="mt-3 block text-xs font-semibold text-slate-600">Mover a etapa<select className={inputStyle+" mt-1"} value={row.etapa} onChange={e=>void changeStage(row,e.target.value as Stage)}>{stages.map(s=><option key={s} value={s}>{names[s]}</option>)}</select></label>
+     </article>)}
+     {!items.length&&<p className="text-sm text-slate-400">{loading?"Cargando…":"Sin oportunidades"}</p>}
+    </div>})}
+   </section>
+   {rows.length===500&&<p className="text-sm text-amber-700">Mostrando las primeras 500 oportunidades. Se agregará paginación en una próxima mejora.</p>}
+  </div>
+ </main>;
+}
