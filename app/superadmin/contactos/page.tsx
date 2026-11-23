@@ -15,6 +15,16 @@ const btn = "rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm fon
 const digits = (v: string) => v.replace(/\D/g, "");
 const nombre = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Sin nombre";
 const parseEntries = (values: string[]) => values.map(v => v.trim()).filter(Boolean);
+// Compara lo que realmente se guarda: ignora espacios externos y campos de medios vacíos.
+const formSnapshot = (value: Form) => JSON.stringify({
+  nombre: value.nombre.trim(),
+  apellido: value.apellido.trim(),
+  empresa: value.empresa.trim(),
+  direccion: value.direccion.trim(),
+  notas: value.notas.trim(),
+  correos: parseEntries(value.correos),
+  telefonos: parseEntries(value.telefonos),
+});
 type ContactosRespuesta = { total: number; rows: Contacto[] };
 
 // La misma consulta paginada sirve al directorio y a la exportación completa.
@@ -58,11 +68,13 @@ export default function ContactosPage() {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Contacto | null>(null);
   const [form, setForm] = useState<Form>(empty);
+  const [originalForm, setOriginalForm] = useState<Form>(empty);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [matches, setMatches] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const reload = useCallback(() => setRevision(n => n + 1), []);
+  const hasChanges = formSnapshot(form) !== formSnapshot(originalForm);
 
   useEffect(() => { if (!cargando && !esPlatformAdmin) router.replace("/"); }, [cargando, esPlatformAdmin, router]);
   useEffect(() => {
@@ -101,16 +113,24 @@ export default function ContactosPage() {
       .sort((a, b) => Number(b.es_principal) - Number(a.es_principal)).map(m => m.valor) ?? [];
     const telefonos = c?.crm_contacto_medios.filter(m => m.tipo === "telefono")
       .sort((a, b) => Number(b.es_principal) - Number(a.es_principal)).map(m => m.valor) ?? [];
-    setForm(c ? {
+    const nextForm: Form = c ? {
       nombre: c.nombre ?? "", apellido: c.apellido ?? "", empresa: c.empresa ?? "",
       direccion: c.direccion ?? "", notas: c.notas ?? "",
       correos: correos.length ? correos : [""],
       telefonos: telefonos.length ? telefonos : [""],
-    } : empty());
+    } : empty();
+    setForm(nextForm);
+    setOriginalForm(nextForm);
     setMatches([]); setConfirmed(false); setFormError(""); setEditing(true);
   }
   function update<K extends keyof Form>(key: K, value: Form[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
+    setMatches([]); setConfirmed(false); setFormError("");
+  }
+  function cancelEditing() {
+    if (saving) return;
+    if (hasChanges && !window.confirm("¿Descartar los cambios sin guardar?")) return;
+    setEditing(false);
     setMatches([]); setConfirmed(false); setFormError("");
   }
   function validate() {
@@ -154,7 +174,7 @@ export default function ContactosPage() {
   }
 
   async function save() {
-    if (saving || !esPlatformAdmin) return;
+    if (saving || !esPlatformAdmin || !hasChanges) return;
     const invalid = validate();
     if (invalid) { setFormError(invalid); return; }
     setSaving(true); setFormError("");
@@ -310,7 +330,16 @@ export default function ContactosPage() {
           open={editing}
           title={selected ? "Editar contacto" : "Nuevo contacto"}
           description="Ficha de contacto · Directorio interno"
-          onClose={() => setEditing(false)}
+          onClose={cancelEditing}
+          closeLabel={hasChanges ? "Cancelar" : "Cerrar"}
+          actions={hasChanges ? <button
+            type="button"
+            disabled={saving}
+            onClick={() => void save()}
+            className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? "Guardando…" : confirmed ? "Confirmar y guardar" : "Guardar"}
+          </button> : undefined}
           busy={saving}
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -371,13 +400,6 @@ export default function ContactosPage() {
             <p className="mt-2">No se fusionarán automáticamente. Revisa antes de continuar.</p>
           </div>}
           {formError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{formError}</p>}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button type="button" disabled={saving} onClick={() => void save()}
-              className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-              {saving ? "Procesando…" : confirmed ? "Confirmar y guardar" : "Revisar y guardar"}
-            </button>
-            <button type="button" disabled={saving} onClick={() => setEditing(false)} className={btn}>Cancelar</button>
-          </div>
           <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Búsqueda global y exportación CSV local. Sin importación ni integración externa todavía.</p>
