@@ -85,6 +85,7 @@ export default function ContactosPage() {
     if (!form.nombre.trim() && !form.empresa.trim()) return "Indica un nombre o una empresa.";
     if (form.nombre.length > 120 || form.apellido.length > 120 || form.empresa.length > 180 || form.direccion.length > 2000 || form.notas.length > 4000)
       return "Uno de los campos excede la longitud permitida.";
+    if (form.correos.length > 10 || form.telefonos.length > 10) return "Máximo 10 correos y 10 teléfonos por contacto.";
     const emails = parseEntries(form.correos).map(s => s.toLowerCase());
     const phones = parseEntries(form.telefonos).map(digits);
     if (emails.some(e => e.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) return "Revisa los correos electrónicos.";
@@ -128,43 +129,26 @@ export default function ContactosPage() {
           return;
         }
       }
-      const payload = { nombre: form.nombre.trim() || null, apellido: form.apellido.trim() || null,
-        empresa: form.empresa.trim() || null, direccion: form.direccion.trim() || null, notas: form.notas.trim() || null };
-      let id = selected?.id;
-      if (selected) {
-        const { data, error: err } = await supabase.from("crm_contactos").update(payload)
-          .eq("id", selected.id).eq("ambito", "plataforma").eq("updated_at", selected.updated_at)
-          .select("id").single();
-        if (err || !data) throw new Error(err?.message || "El contacto cambió. Actualiza la página.");
-      } else {
-        const { data, error: err } = await supabase.from("crm_contactos")
-          .insert({ ...payload, ambito: "plataforma" }).select("id").single();
-        if (err || !data) throw new Error(err?.message || "No se pudo crear el contacto.");
-        id = data.id;
-      }
-      if (!id) throw new Error("No se obtuvo el identificador.");
-      // MVP: sustituye los medios solo después de guardar el contacto.
-      // No es una transacción: si falla, avisar que podría haber cambios parciales.
-      const old = selected?.crm_contacto_medios ?? [];
-      for (const m of old) {
-        const { error: err } = await supabase.from("crm_contacto_medios").delete().eq("id", m.id);
-        if (err) throw err;
-      }
-      const emails = parseEntries(form.correos).map((valor, index) =>
-        ({ contacto_id: id, tipo: "correo", valor, es_principal: index === 0 }));
-      const phones = parseEntries(form.telefonos).map((valor, index) =>
-        ({ contacto_id: id, tipo: "telefono", valor, es_principal: index === 0 }));
-      const medios = [...emails, ...phones];
-      if (medios.length) {
-        const { error: err } = await supabase.from("crm_contacto_medios").insert(medios);
-        if (err) throw err;
-      }
+      // Una sola llamada RPC ejecuta la ficha y todos los medios en una transacción.
+      // La base de datos aplica RLS, valida los medios y rechaza versiones obsoletas.
+      const { data, error: err } = await supabase.rpc("crm_guardar_contacto_plataforma", {
+        p_contacto_id: selected?.id ?? null,
+        p_expected_updated_at: selected?.updated_at ?? null,
+        p_nombre: form.nombre.trim() || null,
+        p_apellido: form.apellido.trim() || null,
+        p_empresa: form.empresa.trim() || null,
+        p_direccion: form.direccion.trim() || null,
+        p_notas: form.notas.trim() || null,
+        p_correos: parseEntries(form.correos),
+        p_telefonos: parseEntries(form.telefonos),
+      });
+      if (err || !data) throw new Error(err?.message || "No se pudo guardar el contacto.");
       setEditing(false); setMatches([]); setConfirmed(false);
       setNotice(selected ? "Contacto actualizado." : "Contacto creado.");
       reload();
     } catch (err) {
       setFormError((err instanceof Error ? err.message : "No se pudo guardar.") +
-        " Algunos cambios podrían haberse aplicado; actualiza y revisa antes de reintentar.");
+        " Si se interrumpió la conexión, actualiza el directorio antes de reintentar para evitar duplicados.");
     } finally { setSaving(false); }
   }
 
@@ -267,7 +251,7 @@ export default function ContactosPage() {
                   onClick={() => update("correos", form.correos.filter((_, i) => i !== index))}
                   className={btn}>Quitar</button>}
               </div>)}
-              <button type="button" disabled={saving} onClick={() => update("correos", [...form.correos, ""])}
+              <button type="button" disabled={saving || form.correos.length >= 10} onClick={() => update("correos", [...form.correos, ""])}
                 className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar correo</button>
               <p className="text-xs text-slate-500">El primer correo ingresado será el principal.</p>
             </div>
@@ -285,7 +269,7 @@ export default function ContactosPage() {
                   onClick={() => update("telefonos", form.telefonos.filter((_, i) => i !== index))}
                   className={btn}>Quitar</button>}
               </div>)}
-              <button type="button" disabled={saving} onClick={() => update("telefonos", [...form.telefonos, ""])}
+              <button type="button" disabled={saving || form.telefonos.length >= 10} onClick={() => update("telefonos", [...form.telefonos, ""])}
                 className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar teléfono</button>
               <p className="text-xs text-slate-500">El primer teléfono ingresado será el principal. Puedes incluir la clave de país.</p>
             </div>
@@ -312,7 +296,7 @@ export default function ContactosPage() {
             </button>
             <button type="button" disabled={saving} onClick={() => setEditing(false)} className={btn}>Cancelar</button>
           </div>
-          <p className="mt-4 text-xs text-slate-500">Versión DEV: el guardado de datos y medios no es atómico. Si aparece un error, revisa el contacto antes de reintentar.</p>
+          <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Sin exportación, importación ni integración externa todavía.</p>
       </div>
