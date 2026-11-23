@@ -47,6 +47,7 @@ export default function OportunidadesPage(){
  useEffect(()=>{if(!cargando&&esPlatformAdmin)void load();},[cargando,esPlatformAdmin,load]);
  useEffect(()=>{if(!showCreate)return;const previous=document.body.style.overflow;document.body.style.overflow="hidden";const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape"&&!saving)setShowCreate(false);if(e.key==="Tab"&&modalRef.current){const focusable=Array.from(modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])"));if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener("keydown",onKey);modalRef.current?.querySelector<HTMLElement>("select")?.focus();return()=>{document.body.style.overflow=previous;document.removeEventListener("keydown",onKey);openButtonRef.current?.focus();};},[showCreate,saving]);
  const normalize=(s:string)=>s.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("es-MX");
+ useEffect(()=>{if(loading||!contacts.length)return;const id=new URLSearchParams(window.location.search).get("contacto");if(!id)return;const found=contacts.some(c=>c.id===id);if(found){setContactId(id);setShowCreate(true);}else setError("El contacto solicitado no está disponible o está archivado.");window.history.replaceState(null,"",window.location.pathname);},[loading,contacts]);
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre":"Contacto no disponible";};
  async function create(e:React.FormEvent<HTMLFormElement>){
   e.preventDefault();if(saving)return;
@@ -133,7 +134,7 @@ export default function OportunidadesPage(){
          onDragEnd={()=>{setDragId(null);setOverStage(null);}}
          aria-label={`Oportunidad ${row.titulo}, etapa ${names[row.etapa]}`}
          className={`cursor-grab rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:cursor-grabbing ${dragId===row.id?"opacity-40":""} ${movingId===row.id?"opacity-60":""}`}>
-         <h4 className="font-semibold">{row.titulo}</h4><p className="mt-1 text-sm text-slate-600">{contactName(row.contacto_id)}</p>
+         <h4 className="font-semibold">{row.titulo}</h4><p className="mt-1 text-sm"><Link href={`/superadmin/contactos?contacto=${encodeURIComponent(row.contacto_id)}`} className="font-medium text-emerald-700 underline-offset-2 hover:underline" draggable={false} onDragStart={e=>e.stopPropagation()}>{contactName(row.contacto_id)} ↗</Link></p>
          <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
          {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
          {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
