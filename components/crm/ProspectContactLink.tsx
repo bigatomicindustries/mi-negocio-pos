@@ -31,11 +31,12 @@ const primary = "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-
 const nombreContacto = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Contacto sin nombre";
 
 export default function ProspectContactLink({
-  prospecto, disabled = false, onBusyChange,
+  prospecto, disabled = false, onBusyChange, onChange,
 }: {
   prospecto: Prospecto;
   disabled?: boolean;
   onBusyChange: (busy: boolean) => void;
+  onChange?: () => void;
 }) {
   const [linked, setLinked] = useState<Contacto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,7 +133,7 @@ export default function ProspectContactLink({
         : err.message);
       setMode("none");
       setNotice("Prospecto vinculado con el contacto existente.");
-      setRevision(v => v + 1);
+      setRevision(v => v + 1); onChange?.();
     });
   }
 
@@ -170,7 +171,7 @@ export default function ProspectContactLink({
       if (!data) throw new Error("No se obtuvo el identificador del nuevo contacto.");
       setMode("none");
       setNotice("Contacto creado y vinculado. La solicitud y su historial se conservaron.");
-      setRevision(v => v + 1);
+      setRevision(v => v + 1); onChange?.();
     });
   }
 
@@ -181,7 +182,7 @@ export default function ProspectContactLink({
         .delete().eq(foreignKey, prospecto.id).eq("contacto_id", linked.id).select("id");
       if (err || !data?.length) throw new Error(err?.message || "El vínculo cambió. Actualiza el seguimiento.");
       setNotice("Vínculo eliminado. El contacto y el prospecto siguen registrados.");
-      setRevision(v => v + 1);
+      setRevision(v => v + 1); onChange?.();
     });
   }
 
