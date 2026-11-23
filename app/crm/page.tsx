@@ -7,6 +7,7 @@ import CRMWorkspace,{type CRMSection} from "@/components/crm/CRMWorkspace";
 import BusinessTaskCenter from "@/components/crm/BusinessTaskCenter";
 import BusinessOpportunityActivities from "@/components/crm/BusinessOpportunityActivities";
 import OpportunityCommercialOverview from "@/components/crm/OpportunityCommercialOverview";
+import CRMTaskNotifications from "@/components/crm/CRMTaskNotifications";
 import CRMOpportunityBoard,{type CRMStage} from "@/components/crm/CRMOpportunityBoard";
 import {useSearchParams} from "next/navigation";
 import Link from "next/link";
@@ -107,6 +108,7 @@ function NegocioCRMContent(){
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido,c.empresa].filter(Boolean).join(" · "):"Contacto no disponible";};
  const opportunityName=(id:string)=>opps.find(o=>o.id===id)?.titulo||"Oportunidad no disponible";
  return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"}>
+  <CRMTaskNotifications tasks={tasks} opportunities={opps} loading={loading} onRefresh={()=>void load()}/>
   {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
   {section==="resumen"&&<div className="space-y-6">
@@ -138,7 +140,7 @@ function NegocioCRMContent(){
   </div>}
   {editing&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10"><div role="dialog" aria-modal="true" aria-label="Editar oportunidad" className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Oportunidad comercial</h2><div className="flex gap-2">{editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button></div></div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} required value={editTitle} onChange={e=>setEditTitle(e.target.value)}/></label><label className="block text-sm font-semibold">Contacto<select className={input+" mt-1"} required value={editContact} onChange={e=>setEditContact(e.target.value)}>{contacts.map(contact=><option key={contact.id} value={contact.id}>{contactName(contact.id)}</option>)}</select></label><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Etapa<select className={input+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>{stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></label></form><OpportunityCommercialOverview contact={contacts.find(c=>c.id===editing.contacto_id)||null} tasks={tasks.filter(t=>t.oportunidad_id===editing.id)} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
   {section==="contactos"&&<BusinessContacts businessId={negocio!.id} contacts={contacts} opportunities={opps} tasks={tasks} onSaved={load}/>}
-  {section==="trabajo"&&<BusinessTaskCenter tasks={tasks} opportunities={opps} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
+  {section==="trabajo"&&<BusinessTaskCenter tasks={tasks} opportunities={opps} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
  </CRMWorkspace>;
 }
 export default function NegocioCRM(){return <Suspense fallback={<main className="p-8">Cargando CRM…</main>}><NegocioCRMContent/></Suspense>;}
