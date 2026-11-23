@@ -6,10 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import OpportunityActivities from "@/components/crm/OpportunityActivities";
 import OpportunityTasks from "@/components/crm/OpportunityTasks";
+import {CRM_STAGES,CRM_STAGE_NAMES,type CRMStage} from "@/components/crm/CRMOpportunityBoard";
 
-const stages = ["nuevo", "contactado", "propuesta", "negociacion", "ganado", "perdido"] as const;
-type Stage = typeof stages[number];
-const names: Record<Stage,string> = {nuevo:"Nuevo",contactado:"Contactado",propuesta:"Propuesta",negociacion:"Negociación",ganado:"Ganado",perdido:"Perdido"};
+const stages=CRM_STAGES;
+type Stage=CRMStage;
+const names=CRM_STAGE_NAMES;
 type Contact = {id:string; nombre:string|null; apellido:string|null; empresa:string|null};
 type Opportunity = {id:string;contacto_id:string;titulo:string;etapa:Stage;valor_estimado:number;fecha_cierre_estimada:string|null;notas:string|null};
 const inputStyle="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none";
