@@ -72,7 +72,6 @@ export default function ContactosPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [matches, setMatches] = useState<string[]>([]);
-  const [confirmed, setConfirmed] = useState(false);
   const reload = useCallback(() => setRevision(n => n + 1), []);
   const hasChanges = formSnapshot(form) !== formSnapshot(originalForm);
 
@@ -121,17 +120,17 @@ export default function ContactosPage() {
     } : empty();
     setForm(nextForm);
     setOriginalForm(nextForm);
-    setMatches([]); setConfirmed(false); setFormError(""); setEditing(true);
+    setMatches([]); setFormError(""); setEditing(true);
   }
   function update<K extends keyof Form>(key: K, value: Form[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
-    setMatches([]); setConfirmed(false); setFormError("");
+    setMatches([]); setFormError("");
   }
   function cancelEditing() {
     if (saving) return;
     if (hasChanges && !window.confirm("¿Descartar los cambios sin guardar?")) return;
     setEditing(false);
-    setMatches([]); setConfirmed(false); setFormError("");
+    setMatches([]); setFormError("");
   }
   function validate() {
     if (!form.nombre.trim() && !form.empresa.trim()) return "Indica un nombre o una empresa.";
@@ -156,14 +155,14 @@ export default function ContactosPage() {
       const { data, error: err } = await supabase.from("crm_contacto_medios")
         .select("contacto_id,crm_contactos!inner(id,ambito,nombre,apellido,empresa,archivado_at)")
         .eq("tipo", v.tipo).eq("valor_normalizado", v.value)
-        .eq("crm_contactos.ambito", "plataforma").is("crm_contactos.archivado_at", null).limit(101);
+        .eq("crm_contactos.ambito", "plataforma").limit(101);
       if (err) throw err;
       if ((data ?? []).length > 100) throw new Error("Hay demasiadas coincidencias. Refina los datos antes de guardar.");
       for (const match of data ?? []) {
         if (match.contacto_id === selected?.id) continue;
-        const c = match.crm_contactos as unknown as { nombre: string | null; apellido: string | null; empresa: string | null };
+        const c = match.crm_contactos as unknown as { nombre: string | null; apellido: string | null; empresa: string | null; archivado_at: string | null };
         const previo = found.get(match.contacto_id) ?? {
-          nombre: [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Otro contacto",
+          nombre: ([c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Otro contacto") + (c.archivado_at ? " [archivado]" : ""),
           motivos: new Set<string>(),
         };
         previo.motivos.add(v.tipo === "correo" ? "correo" : "teléfono");
@@ -174,21 +173,19 @@ export default function ContactosPage() {
   }
 
   async function save() {
-    if (saving || !esPlatformAdmin || !hasChanges) return;
+    if (saving || !esPlatformAdmin || !hasChanges || matches.length > 0) return;
     const invalid = validate();
     if (invalid) { setFormError(invalid); return; }
     setSaving(true); setFormError("");
     try {
-      if (!confirmed) {
-        const found = await checkDuplicates();
-        if (found.length) {
-          setMatches(found); setConfirmed(true);
-          setFormError("Se encontraron posibles duplicados. Revisa antes de confirmar.");
-          return;
-        }
+      // Verificación informativa antes de guardar: también revisa archivados.
+      // El trigger de la base de datos bloquea duplicados incluso entre solicitudes simultáneas.
+      const found = await checkDuplicates();
+      if (found.length) {
+        setMatches(found);
+        setFormError("No se guardó el contacto. Elimina o cambia los datos repetidos para continuar.");
+        return;
       }
-      // Una sola llamada RPC ejecuta la ficha y todos los medios en una transacción.
-      // La base de datos aplica RLS, valida los medios y rechaza versiones obsoletas.
       const { data, error: err } = await supabase.rpc("crm_guardar_contacto_plataforma", {
         p_contacto_id: selected?.id ?? null,
         p_expected_updated_at: selected?.updated_at ?? null,
@@ -200,13 +197,17 @@ export default function ContactosPage() {
         p_correos: parseEntries(form.correos),
         p_telefonos: parseEntries(form.telefonos),
       });
-      if (err || !data) throw new Error(err?.message || "No se pudo guardar el contacto.");
-      setEditing(false); setMatches([]); setConfirmed(false);
+      if (err) {
+        if (err.code === "23505") throw new Error("Este correo o teléfono ya está registrado en otro contacto. Modifícalo para poder guardar.");
+        throw new Error(err.message);
+      }
+      if (!data) throw new Error("No se pudo guardar el contacto.");
+      setEditing(false); setMatches([]);
       setNotice(selected ? "Contacto actualizado." : "Contacto creado.");
       reload();
     } catch (err) {
       setFormError((err instanceof Error ? err.message : "No se pudo guardar.") +
-        " Si se interrumpió la conexión, actualiza el directorio antes de reintentar para evitar duplicados.");
+        " Si se interrumpió la conexión, actualiza el directorio antes de reintentar.");
     } finally { setSaving(false); }
   }
 
@@ -277,7 +278,7 @@ export default function ContactosPage() {
         <header className="rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-9 text-white shadow-lg sm:px-9">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM 1.5 · DEV</p>
           <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Contactos, <span className="text-emerald-300">sin complicaciones.</span></h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Personas y empresas en un solo directorio, con varios teléfonos, correos y revisión de coincidencias.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Personas y empresas en un solo directorio, con varios teléfonos y correos. El sistema bloquea nuevos datos duplicados.</p>
           <p className="mt-4 text-xs text-emerald-200">Directorio interno · Acceso para clientes desactivado</p>
         </header>
         <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -334,13 +335,24 @@ export default function ContactosPage() {
           closeLabel={hasChanges ? "Cancelar" : "Cerrar"}
           actions={hasChanges ? <button
             type="button"
-            disabled={saving}
+            disabled={saving || matches.length > 0}
             onClick={() => void save()}
             className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? "Guardando…" : confirmed ? "Confirmar y guardar" : "Guardar"}
+            {saving ? "Guardando…" : "Guardar"}
           </button> : undefined}
           busy={saving}
+          alert={(matches.length > 0 || formError) ? (
+            <div className={matches.length > 0
+              ? "rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+              : "rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"}>
+              <p className="font-bold">{matches.length > 0 ? "Guardado bloqueado: datos duplicados" : "Revisa el formulario"}</p>
+              {matches.length > 0 && <ul className="mt-2 list-inside list-disc space-y-1">
+                {matches.map(n => <li key={n}>{n}</li>)}
+              </ul>}
+              {formError && <p className="mt-2">{formError}</p>}
+            </div>
+          ) : undefined}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
@@ -394,12 +406,6 @@ export default function ContactosPage() {
               <textarea value={form.notas} onChange={e => update("notas", e.target.value)} rows={3} maxLength={4000} className={field} />
             </label>
           </div>
-          {matches.length > 0 && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-bold">Posibles duplicados encontrados:</p>
-            <ul className="mt-2 list-inside list-disc">{matches.map(n => <li key={n}>{n}</li>)}</ul>
-            <p className="mt-2">No se fusionarán automáticamente. Revisa antes de continuar.</p>
-          </div>}
-          {formError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{formError}</p>}
           <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Búsqueda global y exportación CSV local. Sin importación ni integración externa todavía.</p>
