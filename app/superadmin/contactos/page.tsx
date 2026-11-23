@@ -345,15 +345,15 @@ export default function ContactosPage() {
                 c.crm_contacto_medios.find(m => m.tipo === "correo");
               const phone = c.crm_contacto_medios.find(m => m.tipo === "telefono" && m.es_principal) ??
                 c.crm_contacto_medios.find(m => m.tipo === "telefono");
-              return <article key={c.id} className="flex flex-wrap items-center justify-between gap-4 p-5 hover:bg-slate-50">
-                <div className="flex min-w-0 items-center gap-3">
+              return <article key={c.id} onClick={() => open(c)} className="flex cursor-pointer flex-wrap items-center justify-between gap-4 p-5 transition-colors hover:bg-slate-50">
+                <button type="button" onClick={() => open(c)} aria-label={`Abrir ficha comercial de ${nombre(c)}`} className="flex min-w-0 items-center gap-3 text-left focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 font-bold text-emerald-800">{nombre(c)[0].toUpperCase()}</div>
                   <div><h3 className="font-bold">{nombre(c)}</h3>
                     <p className="text-sm text-slate-500">{c.empresa || "Sin empresa"}</p>
                     <p className="break-all text-xs text-slate-600">{phone?.valor || "Sin teléfono"} · {mail?.valor || "Sin correo"}</p>
                   </div>
-                </div>
-                <div className="flex gap-2">
+                </button>
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                   <button type="button" onClick={() => open(c)} className={btn}>Ver / editar</button>
                   {!archived && <Link href={`/superadmin/oportunidades?contacto=${encodeURIComponent(c.id)}`} className={btn}>+ Oportunidad</Link>}
                   <button type="button" disabled={saving} onClick={() => void setArchive(c, !archived)} className={btn}>{archived ? "Recuperar" : "Archivar"}</button>
