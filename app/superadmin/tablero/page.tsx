@@ -426,6 +426,7 @@ export default function TableroComercialPage() {
         <nav aria-label="Navegación comercial" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold">
           <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
           <Link href="/superadmin/prospectos" className="text-emerald-700 transition hover:text-emerald-900">Seguimiento de prospectos →</Link>
+          <Link href="/superadmin/centro-trabajo" className="text-emerald-700 transition hover:text-emerald-900">Centro de trabajo 1.4 →</Link>
         </nav>
 
         <header className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 sm:px-9 sm:py-10">
