@@ -7,7 +7,6 @@ import CRMWorkspace,{type CRMSection} from "@/components/crm/CRMWorkspace";
 import BusinessTaskCenter from "@/components/crm/BusinessTaskCenter";
 import BusinessOpportunityActivities from "@/components/crm/BusinessOpportunityActivities";
 import OpportunityCommercialOverview from "@/components/crm/OpportunityCommercialOverview";
-import CRMTaskNotifications from "@/components/crm/CRMTaskNotifications";
 import CRMOpportunityBoard,{type CRMStage} from "@/components/crm/CRMOpportunityBoard";
 import {useSearchParams} from "next/navigation";
 import Link from "next/link";
@@ -107,8 +106,11 @@ function NegocioCRMContent(){
  if(!allowed)return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-bold">CRM no disponible</h1><p className="mt-3 text-slate-600">Tu cuenta no tiene acceso al CRM de este negocio. Consulta al administrador.</p>{error&&<p role="alert" className="mt-3 text-red-700">{error}</p>}</main>;
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido,c.empresa].filter(Boolean).join(" · "):"Contacto no disponible";};
  const opportunityName=(id:string)=>opps.find(o=>o.id===id)?.titulo||"Oportunidad no disponible";
- return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"}>
-  <CRMTaskNotifications tasks={tasks} opportunities={opps} loading={loading} onRefresh={()=>void load()}/>
+ const now=Date.now();
+ const nextWeek=now+7*24*60*60*1000;
+ const opportunityIds=new Set(opps.map(o=>o.id));
+ const pendingAlerts=tasks.filter(t=>!t.completada_at&&opportunityIds.has(t.oportunidad_id)&&new Date(t.vence_at).getTime()<=nextWeek).length;
+ return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"} pendingAlerts={pendingAlerts}>
   {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
   {section==="resumen"&&<div className="space-y-6">
