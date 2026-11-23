@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,31 @@ const btn = "rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm fon
 const digits = (v: string) => v.replace(/\D/g, "");
 const nombre = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Sin nombre";
 const parseEntries = (values: string[]) => values.map(v => v.trim()).filter(Boolean);
+type ContactosRespuesta = { total: number; rows: Contacto[] };
+
+// La misma consulta paginada sirve al directorio y a la exportación completa.
+async function buscarContactos(busqueda: string, archivados: boolean, limite: number, offset: number): Promise<ContactosRespuesta> {
+  const { data, error } = await supabase.rpc("crm_listar_contactos_plataforma", {
+    p_busqueda: busqueda,
+    p_archivados: archivados,
+    p_limite: limite,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  const resultado = data as ContactosRespuesta | null;
+  if (!resultado || !Array.isArray(resultado.rows) || typeof resultado.total !== "number" ||
+    !Number.isSafeInteger(resultado.total) || resultado.total < 0) {
+    throw new Error("La respuesta del directorio no tiene el formato esperado.");
+  }
+  return resultado;
+}
+
+// Previene la ejecución de fórmulas al abrir el CSV en Excel u otras hojas de cálculo.
+const csvCell = (value: unknown) => {
+  const raw = String(value ?? "");
+  const safe = /^[\s\u0000-\u001f]*[=+\-@]/u.test(raw) ? "'" + raw : raw;
+  return '"' + safe.replace(/"/g, '""') + '"';
+};
 
 export default function ContactosPage() {
   const router = useRouter();
@@ -25,6 +50,8 @@ export default function ContactosPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [archived, setArchived] = useState(false);
   const [page, setPage] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -39,29 +66,34 @@ export default function ContactosPage() {
 
   useEffect(() => { if (!cargando && !esPlatformAdmin) router.replace("/"); }, [cargando, esPlatformAdmin, router]);
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  useEffect(() => {
     if (cargando || !esPlatformAdmin) return;
     let cancelled = false;
     async function load() {
       setLoading(true); setError("");
-      const base = supabase.from("crm_contactos")
-        .select("id,nombre,apellido,empresa,direccion,notas,created_at,updated_at,archivado_at,crm_contacto_medios(id,tipo,valor,valor_normalizado,es_principal)", { count: "exact" })
-        .eq("ambito", "plataforma");
-      const q = archived ? base.not("archivado_at", "is", null) : base.is("archivado_at", null);
-      const { data, error: err, count } = await q.order("created_at", { ascending: false }).range(page * 25, page * 25 + 24);
-      if (cancelled) return;
-      if (err) { setError("No se pudo cargar el directorio: " + err.message); setRows([]); setTotal(0); }
-      else { setRows((data ?? []) as Contacto[]); setTotal(count ?? 0); }
-      setLoading(false);
+      try {
+        const result = await buscarContactos(debouncedQuery, archived, 25, page * 25);
+        if (cancelled) return;
+        if (page > 0 && page * 25 >= result.total) {
+          setPage(0);
+          return;
+        }
+        setRows(result.rows);
+        setTotal(result.total);
+      } catch (err) {
+        if (cancelled) return;
+        setError("No se pudo cargar el directorio: " + (err instanceof Error ? err.message : "Error inesperado."));
+        setRows([]); setTotal(0);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
     void load();
     return () => { cancelled = true; };
-  }, [cargando, esPlatformAdmin, archived, page, revision]);
-
-  const visible = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return term ? rows.filter(c => [c.nombre, c.apellido, c.empresa, ...c.crm_contacto_medios.map(m => m.valor)]
-      .some(v => (v ?? "").toLowerCase().includes(term))) : rows;
-  }, [rows, query]);
+  }, [cargando, esPlatformAdmin, archived, debouncedQuery, page, revision]);
 
   function open(c: Contacto | null) {
     setSelected(c);
@@ -95,7 +127,7 @@ export default function ContactosPage() {
     return "";
   }
   async function checkDuplicates() {
-    const found = new Set<string>();
+    const found = new Map<string, { nombre: string; motivos: Set<string> }>();
     const values = [
       ...parseEntries(form.correos).map(v => ({ tipo: "correo", value: v.toLowerCase() })),
       ...parseEntries(form.telefonos).map(v => ({ tipo: "telefono", value: digits(v) })),
@@ -104,15 +136,21 @@ export default function ContactosPage() {
       const { data, error: err } = await supabase.from("crm_contacto_medios")
         .select("contacto_id,crm_contactos!inner(id,ambito,nombre,apellido,empresa,archivado_at)")
         .eq("tipo", v.tipo).eq("valor_normalizado", v.value)
-        .eq("crm_contactos.ambito", "plataforma").is("crm_contactos.archivado_at", null).limit(30);
+        .eq("crm_contactos.ambito", "plataforma").is("crm_contactos.archivado_at", null).limit(101);
       if (err) throw err;
+      if ((data ?? []).length > 100) throw new Error("Hay demasiadas coincidencias. Refina los datos antes de guardar.");
       for (const match of data ?? []) {
         if (match.contacto_id === selected?.id) continue;
         const c = match.crm_contactos as unknown as { nombre: string | null; apellido: string | null; empresa: string | null };
-        found.add([c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Otro contacto");
+        const previo = found.get(match.contacto_id) ?? {
+          nombre: [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Otro contacto",
+          motivos: new Set<string>(),
+        };
+        previo.motivos.add(v.tipo === "correo" ? "correo" : "teléfono");
+        found.set(match.contacto_id, previo);
       }
     }
-    return [...found];
+    return [...found.values()].map(c => c.nombre + " (coincide " + [...c.motivos].join(" y ") + ")");
   }
 
   async function save() {
@@ -152,6 +190,49 @@ export default function ContactosPage() {
     } finally { setSaving(false); }
   }
 
+  async function exportCsv() {
+    if (exporting || saving || loading || !esPlatformAdmin) return;
+    const busqueda = query.trim();
+    if (busqueda.length > 120) { setError("La búsqueda no puede exceder 120 caracteres."); return; }
+    if (!window.confirm("¿Exportar los contactos " + (archived ? "archivados" : "activos") +
+      " que coincidan con el filtro? El CSV incluirá datos personales, notas y direcciones. Guárdalo en un lugar seguro.")) return;
+    setExporting(true); setError(""); setNotice("");
+    try {
+      const primera = await buscarContactos(busqueda, archived, 100, 0);
+      if (primera.total === 0) { setNotice("No hay contactos para exportar con este filtro."); return; }
+      if (primera.total > 2000) throw new Error("Por seguridad, el CSV admite hasta 2,000 contactos. Acota la búsqueda.");
+      const todos = [...primera.rows];
+      for (let offset = todos.length; offset < primera.total; offset += 100) {
+        const lote = await buscarContactos(busqueda, archived, 100, offset);
+        if (lote.total !== primera.total) throw new Error("El directorio cambió durante la exportación. Inténtalo nuevamente.");
+        todos.push(...lote.rows);
+      }
+      if (todos.length !== primera.total || new Set(todos.map(c => c.id)).size !== primera.total)
+        throw new Error("No se pudo obtener una exportación consistente. Actualiza el directorio e inténtalo de nuevo.");
+
+      const encabezados = ["Nombre", "Apellido", "Empresa", "Dirección", "Notas", "Correos", "Teléfonos", "Archivado", "Fecha de alta"];
+      const lineas = todos.map(c => [
+        c.nombre, c.apellido, c.empresa, c.direccion, c.notas,
+        c.crm_contacto_medios.filter(m => m.tipo === "correo").map(m => m.valor).join(" | "),
+        c.crm_contacto_medios.filter(m => m.tipo === "telefono").map(m => m.valor).join(" | "),
+        c.archivado_at ? "Sí" : "No", c.created_at,
+      ].map(csvCell).join(","));
+      const csv = "\uFEFF" + [encabezados.map(csvCell).join(","), ...lineas].join("\r\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = "mi-negocio-contactos-" + (archived ? "archivados-" : "activos-") +
+        new Date().toISOString().slice(0, 10) + ".csv";
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice("Exportación preparada: " + todos.length + " contactos. Protege el archivo CSV.");
+    } catch (err) {
+      setError("No se pudo exportar: " + (err instanceof Error ? err.message : "Error inesperado."));
+    } finally { setExporting(false); }
+  }
+
   async function setArchive(c: Contacto, archive: boolean) {
     if (saving || !esPlatformAdmin) return;
     if (archive && !window.confirm("¿Archivar este contacto?")) return;
@@ -180,15 +261,16 @@ export default function ContactosPage() {
           <p className="mt-4 text-xs text-emerald-200">Directorio interno · Acceso para clientes desactivado</p>
         </header>
         <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <label className="w-full max-w-md text-xs font-bold text-slate-600">Buscar en esta página
-            <input value={query} onChange={e => setQuery(e.target.value)} className={field} placeholder="Nombre, empresa, teléfono o correo" />
+          <label className="w-full max-w-md text-xs font-bold text-slate-600">Buscar en todos los contactos
+            <input value={query} maxLength={120} onChange={e => { setQuery(e.target.value); setPage(0); }} className={field} placeholder="Nombre, empresa, teléfono o correo" />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => { setArchived(v => !v); setPage(0); setQuery(""); }} className={btn}>{archived ? "Ver activos" : "Ver archivados"}</button>
+            <button type="button" onClick={() => { setArchived(v => !v); setPage(0); }} className={btn}>{archived ? "Ver activos" : "Ver archivados"}</button>
             <button type="button" onClick={reload} className={btn}>Actualizar</button>
+            <button type="button" disabled={loading || saving || exporting} onClick={() => void exportCsv()} className={btn}>{exporting ? "Exportando…" : "Exportar CSV"}</button>
             <button type="button" onClick={() => open(null)} className="rounded-xl bg-emerald-400 px-5 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-300">+ Nuevo contacto</button>
           </div>
-          <p className="w-full text-xs text-slate-500">La búsqueda filtra los 25 contactos cargados en esta página. La búsqueda global y exportación llegarán después.</p>
+          <p className="w-full text-xs text-slate-500">Búsqueda global por nombre, empresa, teléfono o correo. Resultados paginados de 25 en 25. Exporta los resultados filtrados (máximo 2,000).</p>
         </section>
         {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
         {error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
@@ -197,9 +279,9 @@ export default function ContactosPage() {
             <h2 className="text-lg font-bold">Directorio {archived ? "archivado" : "activo"}</h2>
             <span className="text-sm text-slate-500">{loading ? "Cargando…" : total + " contactos"}</span>
           </div>
-          {loading ? <p className="p-8 text-sm text-slate-500">Cargando contactos…</p> : visible.length === 0
+          {loading ? <p className="p-8 text-sm text-slate-500">Cargando contactos…</p> : rows.length === 0
             ? <p className="p-8 text-sm text-slate-500">No hay contactos con estos criterios.</p>
-            : <div className="divide-y divide-slate-100">{visible.map(c => {
+            : <div className="divide-y divide-slate-100">{rows.map(c => {
               const mail = c.crm_contacto_medios.find(m => m.tipo === "correo" && m.es_principal) ??
                 c.crm_contacto_medios.find(m => m.tipo === "correo");
               const phone = c.crm_contacto_medios.find(m => m.tipo === "telefono" && m.es_principal) ??
@@ -298,7 +380,7 @@ export default function ContactosPage() {
           </div>
           <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
-        <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Sin exportación, importación ni integración externa todavía.</p>
+        <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Búsqueda global y exportación CSV local. Sin importación ni integración externa todavía.</p>
       </div>
     </main>
   );
