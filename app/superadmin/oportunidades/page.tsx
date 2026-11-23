@@ -38,7 +38,9 @@ export default function OportunidadesPage(){
  const [formError,setFormError]=useState("");
  const snapshot=(t:string,id:string,v:string,d:string,n:string,s:Stage)=>JSON.stringify({title:t.trim(),contactId:id,value:Number(v),closeDate:d,notes:n.trim(),stage:s});
  const dirty=showCreate&&snapshot(title,contactId,value,closeDate,notes,editStage)!==original;
- const closeForm=()=>{if(saving)return;if(dirty&&!window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?"))return;setShowCreate(false);setFormError("");};
+ const dirtyRef=useRef(false);
+ dirtyRef.current=dirty;
+ const closeForm=()=>{if(saving)return;if(dirtyRef.current&&!window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?"))return;setShowCreate(false);setFormError("");};
  const modalRef=useRef<HTMLDivElement>(null);
  const openButtonRef=useRef<HTMLButtonElement>(null);
  const load=useCallback(async()=>{
