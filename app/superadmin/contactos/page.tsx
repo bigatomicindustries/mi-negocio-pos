@@ -14,6 +14,10 @@ const empty = (): Form => ({ nombre: "", apellido: "", empresa: "", direccion: "
 const field = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const btn = "rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:border-emerald-400 disabled:opacity-40";
 const digits = (v: string) => v.replace(/\D/g, "");
+const phoneKey = (v: string) => {
+  const d = digits(v);
+  return /^521\d{10}$/.test(d) ? d.slice(3) : /^52\d{10}$/.test(d) ? d.slice(2) : d;
+};
 const nombre = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Sin nombre";
 const parseEntries = (values: string[]) => values.map(v => v.trim()).filter(Boolean);
 // Compara lo que realmente se guarda: ignora espacios externos y campos de medios vacíos.
@@ -159,7 +163,7 @@ export default function ContactosPage() {
       return "Uno de los campos excede la longitud permitida.";
     if (form.correos.length > 10 || form.telefonos.length > 10) return "Máximo 10 correos y 10 teléfonos por contacto.";
     const emails = parseEntries(form.correos).map(s => s.toLowerCase());
-    const phones = parseEntries(form.telefonos).map(digits);
+    const phones = parseEntries(form.telefonos).map(phoneKey);
     if (emails.some(e => e.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) return "Revisa los correos electrónicos.";
     if (phones.some(p => p.length < 7 || p.length > 15)) return "Los teléfonos deben tener entre 7 y 15 dígitos.";
     if (new Set(emails).size !== emails.length || new Set(phones).size !== phones.length)
@@ -170,12 +174,14 @@ export default function ContactosPage() {
     const found = new Map<string, { nombre: string; motivos: Set<string> }>();
     const values = [
       ...parseEntries(form.correos).map(v => ({ tipo: "correo", value: v.toLowerCase() })),
-      ...parseEntries(form.telefonos).map(v => ({ tipo: "telefono", value: digits(v) })),
+      ...parseEntries(form.telefonos).map(v => ({ tipo: "telefono", value: phoneKey(v) })),
     ];
     for (const v of values) {
+      const equivalentes = v.tipo === "telefono" && v.value.length === 10
+        ? [v.value, "52" + v.value, "521" + v.value] : [v.value];
       const { data, error: err } = await supabase.from("crm_contacto_medios")
         .select("contacto_id,crm_contactos!inner(id,ambito,nombre,apellido,empresa,archivado_at)")
-        .eq("tipo", v.tipo).eq("valor_normalizado", v.value)
+        .eq("tipo", v.tipo).in("valor_normalizado", equivalentes)
         .eq("crm_contactos.ambito", "plataforma").limit(101);
       if (err) throw err;
       if ((data ?? []).length > 100) throw new Error("Hay demasiadas coincidencias. Refina los datos antes de guardar.");
