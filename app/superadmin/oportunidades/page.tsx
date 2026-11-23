@@ -32,6 +32,8 @@ export default function OportunidadesPage(){
  const [search,setSearch]=useState("");
  const [filterContactId,setFilterContactId]=useState("");
  const [showCreate,setShowCreate]=useState(false);
+ const [editingId,setEditingId]=useState<string|null>(null);
+ const [editStage,setEditStage]=useState<Stage>("nuevo");
  const modalRef=useRef<HTMLDivElement>(null);
  const openButtonRef=useRef<HTMLButtonElement>(null);
  const load=useCallback(async()=>{
@@ -58,9 +60,12 @@ export default function OportunidadesPage(){
   setSaving(true);setError("");setNotice("");
   const {data:{user},error:authError}=await supabase.auth.getUser();
   if(authError||!user){setError("Tu sesión expiró. Vuelve a iniciar sesión.");setSaving(false);return;}
-  const {error:saveError}=await supabase.from("crm_oportunidades").insert({contacto_id:contactId,titulo:title.trim(),valor_estimado:amount,fecha_cierre_estimada:closeDate||null,notas:notes.trim()||null,created_by:user.id});
+  const payload={contacto_id:contactId,titulo:title.trim(),valor_estimado:amount,fecha_cierre_estimada:closeDate||null,notas:notes.trim()||null};
+  const {error:saveError}=editingId
+   ? await supabase.from("crm_oportunidades").update({...payload,etapa:editStage,updated_at:new Date().toISOString()}).eq("id",editingId)
+   : await supabase.from("crm_oportunidades").insert({...payload,created_by:user.id});
   if(saveError)setError(saveError.message);
-  else {setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setNotice("Oportunidad creada.");setShowCreate(false);await load();}
+  else {setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setNotice(editingId?"Oportunidad actualizada.":"Oportunidad creada.");setShowCreate(false);setEditingId(null);await load();}
   setSaving(false);
  }
  async function changeStage(row:Opportunity,stage:Stage){
@@ -70,6 +75,13 @@ export default function OportunidadesPage(){
   if(saveError){setError("No se pudo mover la oportunidad: "+saveError.message);}
   else {setRows(current=>current.map(x=>x.id===row.id?{...x,etapa:stage}:x));setNotice("Oportunidad movida a "+names[stage]+".");}
   setMovingId(null);
+ }
+ function openEdit(row:Opportunity){
+  setError("");setNotice("");setEditingId(row.id);setTitle(row.titulo);setContactId(row.contacto_id);
+  setValue(String(row.valor_estimado));setCloseDate(row.fecha_cierre_estimada||"");setNotes(row.notas||"");setEditStage(row.etapa);setShowCreate(true);
+ }
+ function openNew(){
+  setError("");setEditingId(null);setTitle("");setContactId("");setValue("0");setCloseDate("");setNotes("");setEditStage("nuevo");setShowCreate(true);
  }
  function dropOn(stage:Stage){
   const row=rows.find(x=>x.id===dragId);
@@ -96,12 +108,12 @@ export default function OportunidadesPage(){
     <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700">Buscar oportunidades
      <input type="search" value={search} onChange={e=>setSearch(e.target.value)} className={inputStyle+" mt-2"} placeholder="Nombre de contacto, empresa u oportunidad…" aria-label="Buscar oportunidades"/>
     </label>
-    <button ref={openButtonRef} type="button" onClick={()=>{setError("");setShowCreate(true);}} className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">+ Nueva oportunidad</button>
+    <button ref={openButtonRef} type="button" onClick={openNew} className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">+ Nueva oportunidad</button>
    </section>
    {showCreate&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 sm:p-6" onMouseDown={e=>{if(e.target===e.currentTarget&&!saving)setShowCreate(false);}}>
     <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="create-opportunity-title" className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7">
      <div className="mb-5 flex items-center justify-between gap-3">
-      <h2 id="create-opportunity-title" className="text-xl font-bold">Nueva oportunidad</h2>
+      <h2 id="create-opportunity-title" className="text-xl font-bold">{editingId?"Editar oportunidad":"Nueva oportunidad"}</h2>
       <button type="button" onClick={()=>setShowCreate(false)} disabled={saving} aria-label="Cerrar formulario" className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50">✕</button>
      </div>
      {error&&<p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -110,8 +122,9 @@ export default function OportunidadesPage(){
      <label className="text-sm font-medium">Nombre de oportunidad<input className={inputStyle+" mt-1"} value={title} onChange={e=>setTitle(e.target.value)} maxLength={180} required placeholder="Ej. Suscripción anual"/></label>
      <label className="text-sm font-medium">Valor estimado (MXN)<input className={inputStyle+" mt-1"} type="number" min="0" step="0.01" value={value} onChange={e=>setValue(e.target.value)} required/></label>
      <label className="text-sm font-medium">Cierre estimado<input className={inputStyle+" mt-1"} type="date" value={closeDate} onChange={e=>setCloseDate(e.target.value)}/></label>
+     {editingId&&<label className="text-sm font-medium">Etapa<select className={inputStyle+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(s=><option key={s} value={s}>{names[s]}</option>)}</select></label>}
      <label className="text-sm font-medium sm:col-span-2">Notas<input className={inputStyle+" mt-1"} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Detalles relevantes"/></label>
-     <button type="button" onClick={()=>setShowCreate(false)} disabled={saving} className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="submit" disabled={saving||!contacts.length} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":"+ Crear oportunidad"}</button>
+     <button type="button" onClick={()=>setShowCreate(false)} disabled={saving} className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="submit" disabled={saving||!contacts.length} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":editingId?"Guardar cambios":"+ Crear oportunidad"}</button>
     </form>
     </div>
    </div>}
@@ -137,7 +150,7 @@ export default function OportunidadesPage(){
          onDragEnd={()=>{setDragId(null);setOverStage(null);}}
          aria-label={`Oportunidad ${row.titulo}, etapa ${names[row.etapa]}`}
          className={`cursor-grab rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:cursor-grabbing ${dragId===row.id?"opacity-40":""} ${movingId===row.id?"opacity-60":""}`}>
-         <h4 className="font-semibold">{row.titulo}</h4><p className="mt-1 text-sm"><Link href={`/superadmin/contactos?contacto=${encodeURIComponent(row.contacto_id)}`} className="font-medium text-emerald-700 underline-offset-2 hover:underline" draggable={false} onDragStart={e=>e.stopPropagation()}>{contactName(row.contacto_id)} ↗</Link></p>
+         <div className="flex items-start justify-between gap-2"><h4 className="font-semibold">{row.titulo}</h4><button type="button" draggable={false} onClick={()=>openEdit(row)} className="shrink-0 rounded-lg border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-50">Editar</button></div><p className="mt-1 text-sm"><Link href={`/superadmin/contactos?contacto=${encodeURIComponent(row.contacto_id)}`} className="font-medium text-emerald-700 underline-offset-2 hover:underline" draggable={false} onDragStart={e=>e.stopPropagation()}>{contactName(row.contacto_id)} ↗</Link></p>
          <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
          {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
          {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
