@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import CrmModal from "@/components/crm/CrmModal";
 import ContactProspects from "@/components/crm/ContactProspects";
+import ContactCommercialSummary from "@/components/crm/ContactCommercialSummary";
 
 type Medio = { id: string; tipo: "correo" | "telefono"; valor: string; valor_normalizado: string; es_principal: boolean };
 type Contacto = { id: string; nombre: string | null; apellido: string | null; empresa: string | null; direccion: string | null; notas: string | null; created_at: string; updated_at: string; archivado_at: string | null; crm_contacto_medios: Medio[] };
@@ -387,6 +388,7 @@ export default function ContactosPage() {
             </div>
           ) : undefined}
         >
+          {selected && <ContactCommercialSummary key={"commercial:"+selected.id} contactId={selected.id} warnUnsaved={hasChanges} />}
           {selected && <ContactProspects key={selected.id} contactId={selected.id} warnUnsaved={hasChanges} />}
           <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
