@@ -481,7 +481,9 @@ export default function ProspectosPage() {
           size="lg"
         >
           <ProspectContactLink key={selected.fuente + ":" + selected.id}
-            prospecto={selected} disabled={saving || activitySaving} onBusyChange={setLinkBusy} onChange={reload} />
+            prospecto={selected} disabled={saving || activitySaving} onBusyChange={setLinkBusy} onChange={reload}
+            warnUnsaved={editStatus !== selected.estado || editPriority !== selected.crm_prioridad ||
+              nextContact !== (selected.crm_proximo_contacto ?? "") || notes !== (selected.crm_notas ?? "") || Boolean(activityText.trim())} />
           {selected.comentarios && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{selected.comentarios}</p>}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
