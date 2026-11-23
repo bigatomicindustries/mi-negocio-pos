@@ -7,14 +7,14 @@ import { supabase } from "@/lib/supabase";
 import CrmModal from "@/components/crm/CrmModal";
 
 type Medio = { id: string; tipo: "correo" | "telefono"; valor: string; valor_normalizado: string; es_principal: boolean };
-type Contacto = { id: string; nombre: string | null; apellido: string | null; empresa: string | null; notas: string | null; created_at: string; updated_at: string; archivado_at: string | null; crm_contacto_medios: Medio[] };
-type Form = { nombre: string; apellido: string; empresa: string; notas: string; correos: string; telefonos: string };
-const empty = (): Form => ({ nombre: "", apellido: "", empresa: "", notas: "", correos: "", telefonos: "" });
+type Contacto = { id: string; nombre: string | null; apellido: string | null; empresa: string | null; direccion: string | null; notas: string | null; created_at: string; updated_at: string; archivado_at: string | null; crm_contacto_medios: Medio[] };
+type Form = { nombre: string; apellido: string; empresa: string; direccion: string; notas: string; correos: string[]; telefonos: string[] };
+const empty = (): Form => ({ nombre: "", apellido: "", empresa: "", direccion: "", notas: "", correos: [""], telefonos: [""] });
 const field = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const btn = "rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:border-emerald-400 disabled:opacity-40";
 const digits = (v: string) => v.replace(/\D/g, "");
 const nombre = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Sin nombre";
-const parseLines = (v: string) => v.split("\n").map(s => s.trim()).filter(Boolean);
+const parseEntries = (values: string[]) => values.map(v => v.trim()).filter(Boolean);
 
 export default function ContactosPage() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function ContactosPage() {
     async function load() {
       setLoading(true); setError("");
       const base = supabase.from("crm_contactos")
-        .select("id,nombre,apellido,empresa,notas,created_at,updated_at,archivado_at,crm_contacto_medios(id,tipo,valor,valor_normalizado,es_principal)", { count: "exact" })
+        .select("id,nombre,apellido,empresa,direccion,notas,created_at,updated_at,archivado_at,crm_contacto_medios(id,tipo,valor,valor_normalizado,es_principal)", { count: "exact" })
         .eq("ambito", "plataforma");
       const q = archived ? base.not("archivado_at", "is", null) : base.is("archivado_at", null);
       const { data, error: err, count } = await q.order("created_at", { ascending: false }).range(page * 25, page * 25 + 24);
@@ -65,10 +65,15 @@ export default function ContactosPage() {
 
   function open(c: Contacto | null) {
     setSelected(c);
+    const correos = c?.crm_contacto_medios.filter(m => m.tipo === "correo")
+      .sort((a, b) => Number(b.es_principal) - Number(a.es_principal)).map(m => m.valor) ?? [];
+    const telefonos = c?.crm_contacto_medios.filter(m => m.tipo === "telefono")
+      .sort((a, b) => Number(b.es_principal) - Number(a.es_principal)).map(m => m.valor) ?? [];
     setForm(c ? {
-      nombre: c.nombre ?? "", apellido: c.apellido ?? "", empresa: c.empresa ?? "", notas: c.notas ?? "",
-      correos: c.crm_contacto_medios.filter(m => m.tipo === "correo").map(m => m.valor).join("\n"),
-      telefonos: c.crm_contacto_medios.filter(m => m.tipo === "telefono").map(m => m.valor).join("\n"),
+      nombre: c.nombre ?? "", apellido: c.apellido ?? "", empresa: c.empresa ?? "",
+      direccion: c.direccion ?? "", notas: c.notas ?? "",
+      correos: correos.length ? correos : [""],
+      telefonos: telefonos.length ? telefonos : [""],
     } : empty());
     setMatches([]); setConfirmed(false); setFormError(""); setEditing(true);
   }
@@ -78,10 +83,10 @@ export default function ContactosPage() {
   }
   function validate() {
     if (!form.nombre.trim() && !form.empresa.trim()) return "Indica un nombre o una empresa.";
-    if (form.nombre.length > 120 || form.apellido.length > 120 || form.empresa.length > 180 || form.notas.length > 4000)
+    if (form.nombre.length > 120 || form.apellido.length > 120 || form.empresa.length > 180 || form.direccion.length > 2000 || form.notas.length > 4000)
       return "Uno de los campos excede la longitud permitida.";
-    const emails = parseLines(form.correos).map(s => s.toLowerCase());
-    const phones = parseLines(form.telefonos).map(digits);
+    const emails = parseEntries(form.correos).map(s => s.toLowerCase());
+    const phones = parseEntries(form.telefonos).map(digits);
     if (emails.some(e => e.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) return "Revisa los correos electrónicos.";
     if (phones.some(p => p.length < 7 || p.length > 15)) return "Los teléfonos deben tener entre 7 y 15 dígitos.";
     if (new Set(emails).size !== emails.length || new Set(phones).size !== phones.length)
@@ -91,8 +96,8 @@ export default function ContactosPage() {
   async function checkDuplicates() {
     const found = new Set<string>();
     const values = [
-      ...parseLines(form.correos).map(v => ({ tipo: "correo", value: v.toLowerCase() })),
-      ...parseLines(form.telefonos).map(v => ({ tipo: "telefono", value: digits(v) })),
+      ...parseEntries(form.correos).map(v => ({ tipo: "correo", value: v.toLowerCase() })),
+      ...parseEntries(form.telefonos).map(v => ({ tipo: "telefono", value: digits(v) })),
     ];
     for (const v of values) {
       const { data, error: err } = await supabase.from("crm_contacto_medios")
@@ -124,7 +129,7 @@ export default function ContactosPage() {
         }
       }
       const payload = { nombre: form.nombre.trim() || null, apellido: form.apellido.trim() || null,
-        empresa: form.empresa.trim() || null, notas: form.notas.trim() || null };
+        empresa: form.empresa.trim() || null, direccion: form.direccion.trim() || null, notas: form.notas.trim() || null };
       let id = selected?.id;
       if (selected) {
         const { data, error: err } = await supabase.from("crm_contactos").update(payload)
@@ -145,9 +150,9 @@ export default function ContactosPage() {
         const { error: err } = await supabase.from("crm_contacto_medios").delete().eq("id", m.id);
         if (err) throw err;
       }
-      const emails = parseLines(form.correos).map((valor, index) =>
+      const emails = parseEntries(form.correos).map((valor, index) =>
         ({ contacto_id: id, tipo: "correo", valor, es_principal: index === 0 }));
-      const phones = parseLines(form.telefonos).map((valor, index) =>
+      const phones = parseEntries(form.telefonos).map((valor, index) =>
         ({ contacto_id: id, tipo: "telefono", valor, es_principal: index === 0 }));
       const medios = [...emails, ...phones];
       if (medios.length) {
@@ -248,13 +253,47 @@ export default function ContactosPage() {
               <input value={form[key]} maxLength={key === "empresa" ? 180 : 120} onChange={e => update(key, e.target.value)} className={field} />
             </label>)}
             <div className="text-sm text-slate-500 sm:self-end">Se requiere un nombre o una empresa.</div>
-            <label className="text-sm font-semibold text-slate-700">Correos electrónicos
-              <textarea value={form.correos} onChange={e => update("correos", e.target.value)} rows={4} className={field} placeholder={"contacto@empresa.com\nventas@empresa.com"} />
-              <span className="text-xs font-normal text-slate-500">Un correo por línea. El primero será el principal.</span>
-            </label>
-            <label className="text-sm font-semibold text-slate-700">Teléfonos
-              <textarea value={form.telefonos} onChange={e => update("telefonos", e.target.value)} rows={4} className={field} placeholder={"5512345678\n525512345678"} />
-              <span className="text-xs font-normal text-slate-500">Un teléfono por línea. Incluye la clave de país cuando corresponda.</span>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-700">Correos electrónicos</p>
+              {form.correos.map((valor, index) => <div key={index} className="flex items-center gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">{index === 0 ? "Correo principal" : `Correo ${index + 1}`}</span>
+                  <input type="email" value={valor} maxLength={320} disabled={saving}
+                    onChange={e => update("correos", form.correos.map((v, i) => i === index ? e.target.value : v))}
+                    className={field + " mt-0"} placeholder="contacto@empresa.com" />
+                </label>
+                {form.correos.length > 1 && <button type="button" disabled={saving}
+                  aria-label={`Quitar correo ${index + 1}`}
+                  onClick={() => update("correos", form.correos.filter((_, i) => i !== index))}
+                  className={btn}>Quitar</button>}
+              </div>)}
+              <button type="button" disabled={saving} onClick={() => update("correos", [...form.correos, ""])}
+                className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar correo</button>
+              <p className="text-xs text-slate-500">El primer correo ingresado será el principal.</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-700">Teléfonos</p>
+              {form.telefonos.map((valor, index) => <div key={index} className="flex items-center gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">{index === 0 ? "Teléfono principal" : `Teléfono ${index + 1}`}</span>
+                  <input type="tel" inputMode="tel" value={valor} maxLength={32} disabled={saving}
+                    onChange={e => update("telefonos", form.telefonos.map((v, i) => i === index ? e.target.value : v))}
+                    className={field + " mt-0"} placeholder="55 1234 5678" />
+                </label>
+                {form.telefonos.length > 1 && <button type="button" disabled={saving}
+                  aria-label={`Quitar teléfono ${index + 1}`}
+                  onClick={() => update("telefonos", form.telefonos.filter((_, i) => i !== index))}
+                  className={btn}>Quitar</button>}
+              </div>)}
+              <button type="button" disabled={saving} onClick={() => update("telefonos", [...form.telefonos, ""])}
+                className="text-sm font-bold text-emerald-700 hover:underline">+ Agregar teléfono</button>
+              <p className="text-xs text-slate-500">El primer teléfono ingresado será el principal. Puedes incluir la clave de país.</p>
+            </div>
+            <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Dirección (opcional)
+              <textarea value={form.direccion} onChange={e => update("direccion", e.target.value)}
+                rows={3} maxLength={2000} disabled={saving} className={field}
+                placeholder="Escribe la dirección completa o las referencias que necesites, sin separar campos." />
+              <span className="text-xs font-normal text-slate-500">Texto libre: calle, colonia, ciudad y referencias, como prefieras.</span>
             </label>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Notas internas
               <textarea value={form.notas} onChange={e => update("notas", e.target.value)} rows={3} maxLength={4000} className={field} />
