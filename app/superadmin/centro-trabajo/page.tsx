@@ -31,6 +31,7 @@ function diaMexico() {
   const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? "";
   return valor("year") + "-" + valor("month") + "-" + valor("day");
 }
+function diaZona(iso:string){const parts=new Intl.DateTimeFormat("en-US",{timeZone:zona,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(iso));const val=(k:string)=>parts.find(p=>p.type===k)?.value||"";return val("year")+"-"+val("month")+"-"+val("day");}
 function agregarDias(dia: string, n: number) {
   const fecha = new Date(dia + "T12:00:00Z");
   fecha.setUTCDate(fecha.getUTCDate() + n);
@@ -139,7 +140,7 @@ export default function CentroTrabajoPage() {
     setActualizandoTarea(null);
   }
   const tareasFiltradas=tareasOportunidad.filter(t=>{
-    const fecha=new Intl.DateTimeFormat("en-CA",{timeZone:zona,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(t.vence_at));
+    const fecha=diaZona(t.vence_at);
     const categoriaT=t.completada_at?"completadas":fecha<hoy?"vencidos":fecha===hoy?"hoy":"proximos";
     if(filtro==="sin_fecha")return false;
     if(filtro==="todos")return !t.completada_at;
@@ -157,13 +158,14 @@ export default function CentroTrabajoPage() {
     return rango[a.crm_prioridad ?? "media"] - rango[b.crm_prioridad ?? "media"];
   }), [tareas, hoy]);
 
+  const pendientesOportunidad=tareasOportunidad.filter(t=>!t.completada_at);
   const conteos = useMemo(() => ({
-    todos: tareas.length,
-    vencidos: tareas.filter(t => categoria(t, hoy) === "vencidos").length,
-    hoy: tareas.filter(t => categoria(t, hoy) === "hoy").length,
-    proximos: tareas.filter(t => categoria(t, hoy) === "proximos" && (t.crm_proximo_contacto ?? "").slice(0, 10) <= agregarDias(hoy, 7)).length,
+    todos: tareas.length+pendientesOportunidad.length,
+    vencidos: tareas.filter(t => categoria(t, hoy) === "vencidos").length+pendientesOportunidad.filter(t=>diaZona(t.vence_at)<hoy).length,
+    hoy: tareas.filter(t => categoria(t, hoy) === "hoy").length+pendientesOportunidad.filter(t=>diaZona(t.vence_at)===hoy).length,
+    proximos: tareas.filter(t => categoria(t, hoy) === "proximos" && (t.crm_proximo_contacto ?? "").slice(0, 10) <= agregarDias(hoy, 7)).length+pendientesOportunidad.filter(t=>diaZona(t.vence_at)>hoy&&diaZona(t.vence_at)<=agregarDias(hoy,7)).length,
     sin_fecha: tareas.filter(t => categoria(t, hoy) === "sin_fecha").length,
-  }), [tareas, hoy]);
+  }), [tareas, pendientesOportunidad, hoy]);
   const visibles = useMemo(() => ordenadas.filter(t => {
     const c = categoria(t, hoy);
     if (filtro === "proximos" && (c !== "proximos" || (t.crm_proximo_contacto ?? "").slice(0, 10) > agregarDias(hoy, 7))) return false;
@@ -194,13 +196,13 @@ export default function CentroTrabajoPage() {
         </header>
         <section aria-label="Prioridades del día" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {([
-            ["todos", "Abiertos"], ["vencidos", "Vencidos"], ["hoy", "Para hoy"],
+            ["todos", "Pendientes"], ["vencidos", "Vencidos"], ["hoy", "Para hoy"],
             ["proximos", "Próximos 7 días"], ["sin_fecha", "Sin fecha"],
           ] as [Filtro, string][]).map(([key, label]) => (
             <button key={key} type="button" onClick={() => setFiltro(key)} aria-pressed={filtro === key}
               className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-emerald-400 ${filtro === key ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"}`}>
               <span className="block text-xs font-semibold text-slate-600">{label}</span>
-              <strong className="mt-2 block text-3xl">{cargando ? "…" : conteos[key]}</strong>
+              <strong className="mt-2 block text-3xl">{cargando || tareasCargando ? "…" : conteos[key]}</strong>
             </button>
           ))}
         </section>
