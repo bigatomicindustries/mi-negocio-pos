@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import CrmModal from "@/components/crm/CrmModal";
+import ProspectContactLink from "@/components/crm/ProspectContactLink";
 
 const estados = {
   nuevo: "Nuevo",
@@ -122,6 +123,7 @@ export default function ProspectosPage() {
   const [nextContact, setNextContact] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [editError, setEditError] = useState("");
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
@@ -237,12 +239,35 @@ export default function ProspectosPage() {
     return () => { cancelled = true; };
   }, [selected, authLoading, esPlatformAdmin, activityRevision]);
 
+  useEffect(() => {
+    if (authLoading || !esPlatformAdmin) return;
+    const params = new URLSearchParams(window.location.search);
+    const fuente = params.get("fuente");
+    const id = params.get("id");
+    if ((fuente !== "demo" && fuente !== "lead") || !id ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    let cancelled = false;
+    async function openLinkedProspect() {
+      const { data, error: err } = await supabase.from("crm_prospectos")
+        .select("*").eq("fuente", fuente).eq("id", id).maybeSingle();
+      if (cancelled) return;
+      if (err || !data) {
+        setError(err?.message || "No se encontró la solicitud vinculada.");
+        return;
+      }
+      open(data as Prospecto);
+    }
+    void openLinkedProspect();
+    return () => { cancelled = true; };
+  }, [authLoading, esPlatformAdmin]);
+
   function changeAgenda(value: AgendaFiltro) {
     setAgendaFilter(value);
     setPage(0);
   }
 
   function open(p: Prospecto) {
+    setLinkBusy(false);
     setSelected(p);
     setEditStatus(p.estado in estados ? p.estado as Estado : "nuevo");
     setEditPriority(p.crm_prioridad in prioridades ? p.crm_prioridad : "media");
@@ -258,7 +283,7 @@ export default function ProspectosPage() {
   }
 
   async function save() {
-    if (!selected || saving || !esPlatformAdmin) return;
+    if (!selected || saving || linkBusy || !esPlatformAdmin) return;
     setSaving(true);
     setEditError("");
     try {
@@ -283,7 +308,7 @@ export default function ProspectosPage() {
   }
 
   async function addActivity() {
-    if (!selected || activitySaving || !esPlatformAdmin) return;
+    if (!selected || activitySaving || linkBusy || !esPlatformAdmin) return;
     const detail = activityText.trim();
     if (!detail || detail.length > 2000) {
       setActivitiesError("Describe la actividad (máximo 2000 caracteres).");
@@ -325,6 +350,7 @@ export default function ProspectosPage() {
         <nav aria-label="Navegación comercial" className="flex flex-wrap gap-5 text-sm font-semibold">
           <Link href="/superadmin" className="text-green-700 hover:underline">← Negocios</Link>
           <Link href="/superadmin/tablero" className="text-green-700 hover:underline">Tablero comercial · CRM 1.3 →</Link>
+          <Link href="/superadmin/contactos" className="text-green-700 hover:underline">Directorio de contactos →</Link>
         </nav>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -426,9 +452,11 @@ export default function ProspectosPage() {
           title={selected.negocio || selected.nombre || "Solicitud de demo"}
           description={`${selected.whatsapp || "Sin WhatsApp"} · ${selected.email || "Sin correo"}`}
           onClose={() => setSelected(null)}
-          busy={saving || activitySaving}
+          busy={saving || activitySaving || linkBusy}
           size="lg"
         >
+          <ProspectContactLink key={selected.fuente + ":" + selected.id}
+            prospecto={selected} disabled={saving || activitySaving} onBusyChange={setLinkBusy} />
           {selected.comentarios && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{selected.comentarios}</p>}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
@@ -450,7 +478,7 @@ export default function ProspectosPage() {
                 <textarea value={notes} disabled={saving} onChange={e => setNotes(e.target.value)} maxLength={4000} rows={5} className="mt-1 block w-full rounded-lg border p-3" />
               </label>
               {editError && <p role="alert" className="text-sm text-red-700">{editError}</p>}
-              <button type="button" disabled={saving || activitySaving} onClick={save} className="rounded-xl bg-green-700 px-5 py-2 font-semibold text-white hover:bg-green-800 disabled:opacity-50">
+              <button type="button" disabled={saving || activitySaving || linkBusy} onClick={save} className="rounded-xl bg-green-700 px-5 py-2 font-semibold text-white hover:bg-green-800 disabled:opacity-50">
                 {saving ? "Guardando…" : "Guardar seguimiento"}
               </button>
             </div>
@@ -470,7 +498,7 @@ export default function ProspectosPage() {
               <p className="text-xs text-slate-500">El historial se guarda por separado de los cambios de agenda.</p>
               {activitiesError && <p role="alert" className="text-sm text-red-700">{activitiesError}</p>}
               {activityNotice && <p role="status" className="text-sm text-green-700">{activityNotice}</p>}
-              <button type="button" disabled={activitySaving || saving || !activityText.trim()} onClick={addActivity}
+              <button type="button" disabled={activitySaving || saving || linkBusy || !activityText.trim()} onClick={addActivity}
                 className="rounded-xl border border-green-700 px-5 py-2 font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50">
                 {activitySaving ? "Registrando…" : "Registrar actividad"}
               </button>
