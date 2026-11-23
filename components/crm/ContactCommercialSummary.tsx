@@ -49,13 +49,13 @@ export default function ContactCommercialSummary({contactId,warnUnsaved=false,mo
     <div className="rounded-lg bg-white p-3"><p className="text-xs text-slate-500">Oportunidades (hasta 50)</p><p className="text-xl font-bold">{opportunities.length}</p></div>
     <div className="rounded-lg bg-white p-3"><p className="text-xs text-slate-500">Valor abierto mostrado</p><p className="text-lg font-bold">{currency(opportunities.filter(x=>x.etapa!=="ganado"&&x.etapa!=="perdido").reduce((s,x)=>s+Number(x.valor_estimado),0))}</p></div>
    </div>}
-   {mode==="summary" && <div><h4 className="mb-2 text-sm font-bold">Oportunidades relacionadas</h4>
-    {opportunities.length?<ul className="space-y-2">{opportunities.map(o=><li key={o.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white p-3 text-sm"><div><p className="font-semibold">{o.titulo}</p><p className="text-xs text-slate-500">{stageNames[o.etapa]||o.etapa}{o.fecha_cierre_estimada?" · Cierre previsto "+o.fecha_cierre_estimada:""}</p></div><span className="font-semibold text-emerald-700">{currency(Number(o.valor_estimado))}</span></li>)}</ul>:<p className="text-sm text-slate-500">Todavía no hay oportunidades para este contacto.</p>}
+   {mode==="summary" && <div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-bold">Oportunidades relacionadas</h4><Link href={"/superadmin/oportunidades?ver_contacto="+encodeURIComponent(contactId)} onClick={confirmLeave} className="text-xs font-semibold text-emerald-700 hover:underline">Ver en pipeline →</Link></div>
+    {opportunities.length?<ul className="space-y-2">{opportunities.map(o=><li key={o.id} className="rounded-lg bg-white text-sm"><Link href={"/superadmin/oportunidades?ver_contacto="+encodeURIComponent(contactId)} onClick={confirmLeave} className="flex flex-wrap items-center justify-between gap-2 rounded-lg p-3 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600"><div><p className="font-semibold">{o.titulo}</p><p className="text-xs text-slate-500">{stageNames[o.etapa]||o.etapa}{o.fecha_cierre_estimada?" · Cierre previsto "+o.fecha_cierre_estimada:""}</p></div><span className="font-semibold text-emerald-700">{currency(Number(o.valor_estimado))}</span></Link></li>)}</ul>:<p className="text-sm text-slate-500">Todavía no hay oportunidades para este contacto.</p>}
     {opportunities.length===50&&<p className="mt-2 text-xs text-amber-700">Se muestran las 50 oportunidades más recientes.</p>}
    </div>}
-   <div><h4 className="mb-2 text-sm font-bold">Actividad reciente de prospectos vinculados</h4>
+   {mode==="activity" && <div><h4 className="mb-2 text-sm font-bold">Actividad reciente de prospectos vinculados</h4>
     {activities.length?<ul className="space-y-2">{activities.map(a=><li key={a.id} className="rounded-lg bg-white p-3 text-sm"><p className="font-semibold">{a.tipo} <span className="font-normal text-slate-500">· {new Date(a.created_at).toLocaleDateString("es-MX")}</span></p>{a.detalle&&<p className="mt-1 whitespace-pre-wrap text-slate-600">{a.detalle}</p>}</li>)}</ul>:<p className="text-sm text-slate-500">Sin actividades registradas en prospectos vinculados.</p>}
-   </div>
+   </div>}
   </>}
  </section>;
 }
