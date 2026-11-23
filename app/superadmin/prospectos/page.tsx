@@ -106,6 +106,8 @@ export default function ProspectosPage() {
 
   const [hoy, setHoy] = useState(hoyMexico);
   const [rows, setRows] = useState<Prospecto[]>([]);
+  const [linkedKeys, setLinkedKeys] = useState<Set<string>>(() => new Set());
+  const [linkListError, setLinkListError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -204,7 +206,27 @@ export default function ProspectosPage() {
         setError("No se pudieron cargar los prospectos: " + err.message);
         setRows([]); setTotal(0);
       } else {
-        setRows((data ?? []) as Prospecto[]);
+        const prospectos = (data ?? []) as Prospecto[];
+        const demos = prospectos.filter(p => p.fuente === "demo").map(p => p.id);
+        const leads = prospectos.filter(p => p.fuente === "lead").map(p => p.id);
+        const [demoLinks, leadLinks] = await Promise.all([
+          demos.length ? supabase.from("crm_prospecto_contactos").select("demo_request_id").in("demo_request_id", demos)
+            : Promise.resolve({ data: [] as { demo_request_id: string | null }[], error: null }),
+          leads.length ? supabase.from("crm_prospecto_contactos").select("lead_id").in("lead_id", leads)
+            : Promise.resolve({ data: [] as { lead_id: string | null }[], error: null }),
+        ]);
+        if (cancelled) return;
+        if (demoLinks.error || leadLinks.error) {
+          setLinkedKeys(new Set());
+          setLinkListError("No se pudo consultar qué prospectos tienen contacto vinculado.");
+        } else {
+          setLinkListError("");
+          setLinkedKeys(new Set([
+            ...(demoLinks.data ?? []).filter(v => v.demo_request_id).map(v => "demo:" + v.demo_request_id),
+            ...(leadLinks.data ?? []).filter(v => v.lead_id).map(v => "lead:" + v.lead_id),
+          ]));
+        }
+        setRows(prospectos);
         setTotal(count ?? 0);
       }
       setLoading(false);
@@ -373,6 +395,7 @@ export default function ProspectosPage() {
           ))}
         </section>
         {summaryError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{summaryError}</p>}
+        {linkListError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{linkListError}</p>}
 
         <section aria-label="Filtros de prospectos" className="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
           <label className="text-sm font-medium text-slate-700 lg:col-span-2">Buscar
@@ -426,7 +449,9 @@ export default function ProspectosPage() {
                     const overdue = p.crm_proximo_contacto !== null && p.crm_proximo_contacto < hoy;
                     return <tr key={p.fuente + ":" + p.id} className="border-t">
                       <td className="px-4 py-4"><p className="font-semibold text-slate-900">{p.negocio || p.nombre || "Solicitud de demo"}</p><p className="text-xs text-slate-500">{p.nombre || "Sin nombre"}</p></td>
-                      <td className="px-4 py-4 text-slate-600"><p>{p.whatsapp || "—"}</p><p>{p.email || ""}</p></td>
+                      <td className="px-4 py-4 text-slate-600"><p>{p.whatsapp || "—"}</p><p>{p.email || ""}</p>
+                        {linkedKeys.has(p.fuente + ":" + p.id) && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Contacto vinculado</span>}
+                      </td>
                       <td className="px-4 py-4"><span className="whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">{etiquetaEstado(p.estado)}</span></td>
                       <td className="px-4 py-4"><span className={"whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold " + (p.crm_prioridad === "alta" ? "bg-red-50 text-red-700" : p.crm_prioridad === "media" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600")}>{etiquetaPrioridad(p.crm_prioridad)}</span></td>
                       <td className={"whitespace-nowrap px-4 py-4 font-medium " + (overdue ? "text-red-700" : "text-slate-600")}>{agendaLabel}</td>
@@ -456,7 +481,7 @@ export default function ProspectosPage() {
           size="lg"
         >
           <ProspectContactLink key={selected.fuente + ":" + selected.id}
-            prospecto={selected} disabled={saving || activitySaving} onBusyChange={setLinkBusy} />
+            prospecto={selected} disabled={saving || activitySaving} onBusyChange={setLinkBusy} onChange={reload} />
           {selected.comentarios && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{selected.comentarios}</p>}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
