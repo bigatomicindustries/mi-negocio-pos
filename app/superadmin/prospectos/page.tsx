@@ -369,10 +369,15 @@ export default function ProspectosPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <nav aria-label="Navegación comercial" className="flex flex-wrap gap-5 text-sm font-semibold">
-          <Link href="/superadmin" className="text-green-700 hover:underline">← Negocios</Link>
-          <Link href="/superadmin/tablero" className="text-green-700 hover:underline">Tablero comercial · CRM 1.3 →</Link>
-          <Link href="/superadmin/contactos" className="text-green-700 hover:underline">Directorio de contactos →</Link>
+        <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-5">
+            <Link href="/superadmin/tablero" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">CRM</Link>
+            <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Prospectos</span>
+            <Link href="/superadmin/centro-trabajo" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Centro de trabajo</Link>
+            <Link href="/superadmin/contactos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Contactos</Link>
+          </div>
+          <div aria-hidden="true" className="hidden md:block" />
         </nav>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
