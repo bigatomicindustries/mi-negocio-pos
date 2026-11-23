@@ -7,6 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
 type Fuente = "demo" | "lead";
+type OportunidadTarea = {id:string;titulo:string;vence_at:string;completada_at:string|null;oportunidad_id:string};
+type OportunidadInfo = {id:string;titulo:string;contacto_id:string};
 type Prioridad = "baja" | "media" | "alta";
 type Filtro = "todos" | "vencidos" | "hoy" | "proximos" | "sin_fecha";
 type Tarea = {
@@ -52,6 +54,11 @@ export default function CentroTrabajoPage() {
   const { cargando: authLoading, esPlatformAdmin } = useAuth();
   const [hoy, setHoy] = useState(diaMexico);
   const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [tareasOportunidad,setTareasOportunidad] = useState<OportunidadTarea[]>([]);
+  const [oportunidades,setOportunidades] = useState<Record<string,OportunidadInfo>>({});
+  const [tareasError,setTareasError] = useState("");
+  const [tareasCargando,setTareasCargando] = useState(true);
+  const [actualizandoTarea,setActualizandoTarea] = useState<string|null>(null);
   const [contactosVinculados, setContactosVinculados] = useState<Record<string, string>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -107,6 +114,39 @@ export default function CentroTrabajoPage() {
     return () => { cancelado = true; };
   }, [authLoading, esPlatformAdmin, revision]);
 
+  useEffect(()=>{
+    if(authLoading||!esPlatformAdmin)return;
+    let cancelado=false;
+    async function cargarTareas(){
+      setTareasCargando(true);setTareasError("");
+      const [ts,ops]=await Promise.all([
+        supabase.from("crm_oportunidad_tareas").select("id,titulo,vence_at,completada_at,oportunidad_id").order("vence_at",{ascending:true}).limit(1001),
+        supabase.from("crm_oportunidades").select("id,titulo,contacto_id").limit(1000)
+      ]);
+      if(cancelado)return;
+      if(ts.error||ops.error){setTareasError("No se pudieron cargar las tareas comerciales.");setTareasOportunidad([]);}
+      else if((ts.data?.length||0)>1000){setTareasError("Hay más de 1000 tareas; se requiere paginación.");setTareasOportunidad([]);}
+      else {setTareasOportunidad((ts.data||[]) as OportunidadTarea[]);setOportunidades(Object.fromEntries(((ops.data||[]) as OportunidadInfo[]).map(o=>[o.id,o])));}
+      setTareasCargando(false);
+    }
+    void cargarTareas();return()=>{cancelado=true;};
+  },[authLoading,esPlatformAdmin,revision]);
+  async function completarTarea(t:OportunidadTarea){
+    if(actualizandoTarea)return;setActualizandoTarea(t.id);setTareasError("");
+    const r=await supabase.from("crm_oportunidad_tareas").update({completada_at:t.completada_at?null:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",t.id);
+    if(r.error)setTareasError("No se pudo actualizar la tarea: "+r.error.message);
+    else actualizar();
+    setActualizandoTarea(null);
+  }
+  const tareasFiltradas=tareasOportunidad.filter(t=>{
+    const fecha=new Intl.DateTimeFormat("en-CA",{timeZone:zona,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(t.vence_at));
+    const categoriaT=t.completada_at?"completadas":fecha<hoy?"vencidos":fecha===hoy?"hoy":"proximos";
+    if(filtro==="sin_fecha")return false;
+    if(filtro==="todos")return !t.completada_at;
+    if(filtro==="proximos")return categoriaT==="proximos"&&fecha<=agregarDias(hoy,7);
+    return categoriaT===filtro;
+  });
+  const completadas=tareasOportunidad.filter(t=>!!t.completada_at);
   const ordenadas = useMemo(() => [...tareas].sort((a, b) => {
     const orden = { vencidos: 0, hoy: 1, proximos: 2, sin_fecha: 3, todos: 4 };
     const ca = categoria(a, hoy), cb = categoria(b, hoy);
@@ -163,6 +203,12 @@ export default function CentroTrabajoPage() {
               <strong className="mt-2 block text-3xl">{cargando ? "…" : conteos[key]}</strong>
             </button>
           ))}
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Tareas de oportunidades</h2><p className="mt-1 text-sm text-slate-500">Seguimientos programados · {tareasFiltradas.length} pendientes en el filtro actual · {completadas.length} completadas</p></div><button type="button" onClick={actualizar} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Actualizar</button></div>
+          {tareasError&&<p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{tareasError}</p>}
+          {tareasCargando?<p className="text-sm text-slate-500">Cargando tareas…</p>:!tareasError&&tareasFiltradas.length===0?<p className="text-sm text-slate-500">No hay tareas de oportunidades para este filtro.</p>:<ul className="divide-y divide-slate-100">{tareasFiltradas.map(t=><li key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="flex min-w-0 items-start gap-3"><input type="checkbox" aria-label={"Completar "+t.titulo} disabled={!!actualizandoTarea} checked={!!t.completada_at} onChange={()=>void completarTarea(t)} className="mt-1 h-4 w-4 accent-emerald-700"/><div><p className="font-semibold">{t.titulo}</p><p className="text-sm text-slate-500">{oportunidades[t.oportunidad_id]?.titulo||"Oportunidad"} · {fechaLocal(t.vence_at)} · {new Date(t.vence_at).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit",timeZone:zona})}</p></div></div><Link href={"/superadmin/oportunidades?ver_contacto="+encodeURIComponent(oportunidades[t.oportunidad_id]?.contacto_id||"")} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Ver pipeline</Link></li>)}</ul>}
+          {completadas.length>0&&<details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-sm font-semibold">Ver tareas completadas ({completadas.length})</summary><ul className="mt-2 space-y-2">{completadas.map(t=><li key={t.id} className="flex items-center gap-3 text-sm"><input type="checkbox" aria-label={"Reabrir "+t.titulo} checked disabled={!!actualizandoTarea} onChange={()=>void completarTarea(t)}/><span className="text-slate-500 line-through">{t.titulo}</span></li>)}</ul></details>}
         </section>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 p-5">
