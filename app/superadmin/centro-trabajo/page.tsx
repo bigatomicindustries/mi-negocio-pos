@@ -117,9 +117,15 @@ export default function CentroTrabajoPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
       <div className="mx-auto max-w-6xl space-y-7">
-        <nav className="flex flex-wrap gap-5 text-sm font-semibold">
-          <Link href="/superadmin/tablero" className="text-emerald-700 hover:underline">← Tablero comercial</Link>
-          <Link href="/superadmin/prospectos" className="text-emerald-700 hover:underline">Seguimiento de prospectos →</Link>
+        <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-5">
+            <Link href="/superadmin/tablero" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">CRM</Link>
+            <Link href="/superadmin/prospectos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Prospectos</Link>
+            <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Centro de trabajo</span>
+            <Link href="/superadmin/contactos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Contactos</Link>
+          </div>
+          <div aria-hidden="true" className="hidden md:block" />
         </nav>
         <header className="rounded-3xl bg-gradient-to-br from-slate-950 to-emerald-950 px-6 py-9 text-white sm:px-9">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM 1.4 · DEV</p>
