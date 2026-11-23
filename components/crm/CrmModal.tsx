@@ -9,6 +9,8 @@ type CrmModalProps = {
   description?: ReactNode;
   children: ReactNode;
   onClose: () => void;
+  closeLabel?: string;
+  actions?: ReactNode;
   busy?: boolean;
   size?: "md" | "lg";
 };
@@ -21,7 +23,7 @@ const focusableSelector =
  * limita el foco al diálogo y evita el desplazamiento del fondo.
  */
 export default function CrmModal({
-  open, title, description, children, onClose, busy = false, size = "md",
+  open, title, description, children, onClose, closeLabel = "Cerrar", actions, busy = false, size = "md",
 }: CrmModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -102,20 +104,23 @@ export default function CrmModal({
           (size === "lg" ? "max-w-4xl" : "max-w-3xl")
         }
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-7 sm:py-5">
+        <header className="flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-7 sm:py-5">
           <div className="min-w-0">
             <h2 id={titleId} className="break-words text-xl font-bold text-slate-950 sm:text-2xl">{title}</h2>
             {description && <p className="mt-1 break-words text-sm text-slate-600">{description}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            aria-label="Cerrar ventana"
-            className="shrink-0 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Cerrar
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              aria-label={closeLabel === "Cerrar" ? "Cerrar ventana" : closeLabel}
+              className="shrink-0 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {closeLabel}
+            </button>
+          </div>
         </header>
         <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
           {children}
