@@ -157,11 +157,14 @@ export default function OportunidadesPage(){
        </div>
        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {items.map(row=><article key={row.id} draggable={!movingId}
+         tabIndex={0} role="button" aria-label={`Abrir oportunidad ${row.titulo}`}
+         onClick={e=>{if((e.target as HTMLElement).closest("button,a,select,label,input"))return;openEdit(row);}}
+         onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openEdit(row);}}}
          onDragStart={e=>{setDragId(row.id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",row.id);}}
          onDragEnd={()=>{setDragId(null);setOverStage(null);}}
          aria-label={`Oportunidad ${row.titulo}, etapa ${names[row.etapa]}`}
          className={`cursor-grab rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:cursor-grabbing ${dragId===row.id?"opacity-40":""} ${movingId===row.id?"opacity-60":""}`}>
-         <div className="flex items-start justify-between gap-2"><h4 className="font-semibold">{row.titulo}</h4><button type="button" draggable={false} onClick={()=>openEdit(row)} className="shrink-0 rounded-lg border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-50">Editar</button></div><p className="mt-1 text-sm"><Link href={`/superadmin/contactos?contacto=${encodeURIComponent(row.contacto_id)}`} className="font-medium text-emerald-700 underline-offset-2 hover:underline" draggable={false} onDragStart={e=>e.stopPropagation()}>{contactName(row.contacto_id)} ↗</Link></p>
+         <div className="flex items-start justify-between gap-2"><h4 className="font-semibold">{row.titulo}</h4><button type="button" draggable={false} onClick={e=>{e.stopPropagation();openEdit(row);}} className="shrink-0 rounded-lg border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-50">Editar</button></div><p className="mt-1 text-sm"><Link href={`/superadmin/contactos?contacto=${encodeURIComponent(row.contacto_id)}`} className="font-medium text-emerald-700 underline-offset-2 hover:underline" onClick={e=>e.stopPropagation()} draggable={false} onDragStart={e=>e.stopPropagation()}>{contactName(row.contacto_id)} ↗</Link></p>
          <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
          {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
          {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
