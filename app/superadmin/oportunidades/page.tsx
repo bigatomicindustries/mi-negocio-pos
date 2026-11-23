@@ -19,6 +19,9 @@ export default function OportunidadesPage(){
  const [rows,setRows]=useState<Opportunity[]>([]);
  const [loading,setLoading]=useState(true);
  const [saving,setSaving]=useState(false);
+ const [movingId,setMovingId]=useState<string|null>(null);
+ const [dragId,setDragId]=useState<string|null>(null);
+ const [overStage,setOverStage]=useState<Stage|null>(null);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [title,setTitle]=useState("");
@@ -52,10 +55,17 @@ export default function OportunidadesPage(){
   setSaving(false);
  }
  async function changeStage(row:Opportunity,stage:Stage){
-  if(row.etapa===stage)return;
-  setError("");setNotice("");
-  const {error:saveError}=await supabase.from("crm_oportunidades").update({etapa:stage,updated_at:new Date().toISOString()}).eq("id",row.id);
-  if(saveError)setError(saveError.message);else {setRows(current=>current.map(x=>x.id===row.id?{...x,etapa:stage}:x));setNotice("Etapa actualizada.");}
+  if(row.etapa===stage||movingId)return;
+  setError("");setNotice("");setMovingId(row.id);
+  const {error:saveError}=await supabase.from("crm_oportunidades").update({etapa:stage,updated_at:new Date().toISOString()}).eq("id",row.id).eq("etapa",row.etapa).select("id").single();
+  if(saveError){setError("No se pudo mover la oportunidad: "+saveError.message);}
+  else {setRows(current=>current.map(x=>x.id===row.id?{...x,etapa:stage}:x));setNotice("Oportunidad movida a "+names[stage]+".");}
+  setMovingId(null);
+ }
+ function dropOn(stage:Stage){
+  const row=rows.find(x=>x.id===dragId);
+  setDragId(null);setOverStage(null);
+  if(row&&row.etapa!==stage)void changeStage(row,stage);
  }
  if(cargando||!esPlatformAdmin)return <main className="p-8 text-slate-600">Verificando acceso…</main>;
  return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
@@ -88,19 +98,41 @@ export default function OportunidadesPage(){
      <button type="submit" disabled={saving||!contacts.length} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":"+ Crear oportunidad"}</button>
     </form>
    </section>
-   <section aria-label="Etapas del pipeline" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-    {stages.map(stage=>{const items=rows.filter(x=>x.etapa===stage);return <div key={stage} className="min-h-44 rounded-2xl border border-slate-200 bg-white p-4">
-     <div className="mb-4 flex items-center justify-between"><h2 className="font-bold">{names[stage]}</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-sm">{items.length}</span></div>
-     <p className="mb-4 text-sm text-slate-500">{money(items.reduce((s,x)=>s+Number(x.valor_estimado),0))}</p>
-     {items.map(row=><article key={row.id} className="mb-3 rounded-xl border border-slate-200 p-4 shadow-sm">
-      <h3 className="font-semibold">{row.titulo}</h3><p className="mt-1 text-sm text-slate-600">{contactName(row.contacto_id)}</p>
-      <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
-      {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
-      {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
-      <label className="mt-3 block text-xs font-semibold text-slate-600">Mover a etapa<select className={inputStyle+" mt-1"} value={row.etapa} onChange={e=>void changeStage(row,e.target.value as Stage)}>{stages.map(s=><option key={s} value={s}>{names[s]}</option>)}</select></label>
-     </article>)}
-     {!items.length&&<p className="text-sm text-slate-400">{loading?"Cargando…":"Sin oportunidades"}</p>}
-    </div>})}
+   <section aria-label="Etapas del pipeline" className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+     <h2 className="text-xl font-bold">Tablero comercial</h2>
+     <p className="text-sm text-slate-500">Arrastra una tarjeta a otra columna o utiliza «Mover a etapa». Desplázate horizontalmente para ver todas las etapas.</p>
+    </div>
+    <div className="overflow-x-auto pb-4" tabIndex={0} aria-label="Desplazamiento horizontal del pipeline">
+     <div className="flex min-w-max items-start gap-4">
+      {stages.map(stage=>{const items=rows.filter(x=>x.etapa===stage);return <div key={stage}
+       onDragOver={e=>{if(dragId){e.preventDefault();e.dataTransfer.dropEffect="move";setOverStage(stage);}}}
+       onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOverStage(null);}}
+       onDrop={e=>{e.preventDefault();dropOn(stage);}}
+       className={`flex h-[min(70vh,720px)] w-[300px] shrink-0 flex-col rounded-2xl border p-3 transition-colors sm:w-[330px] ${overStage===stage?"border-emerald-500 bg-emerald-50":"border-slate-200 bg-slate-100"}`}>
+       <div className="mb-3 shrink-0 border-b border-slate-200 pb-3">
+        <div className="flex items-center justify-between"><h3 className="font-bold">{names[stage]}</h3><span className="rounded-full bg-white px-3 py-1 text-sm">{items.length}</span></div>
+        <p className="mt-2 text-sm font-semibold text-slate-600">{money(items.reduce((s,x)=>s+Number(x.valor_estimado),0))}</p>
+       </div>
+       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+        {items.map(row=><article key={row.id} draggable={!movingId}
+         onDragStart={e=>{setDragId(row.id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",row.id);}}
+         onDragEnd={()=>{setDragId(null);setOverStage(null);}}
+         aria-label={`Oportunidad ${row.titulo}, etapa ${names[row.etapa]}`}
+         className={`cursor-grab rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:cursor-grabbing ${dragId===row.id?"opacity-40":""} ${movingId===row.id?"opacity-60":""}`}>
+         <h4 className="font-semibold">{row.titulo}</h4><p className="mt-1 text-sm text-slate-600">{contactName(row.contacto_id)}</p>
+         <p className="mt-2 font-semibold text-emerald-700">{money(Number(row.valor_estimado))}</p>
+         {row.fecha_cierre_estimada&&<p className="mt-1 text-xs text-slate-500">Cierre estimado: {row.fecha_cierre_estimada}</p>}
+         {row.notas&&<p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{row.notas}</p>}
+         <label className="mt-3 block text-xs font-semibold text-slate-600">Mover a etapa
+          <select disabled={!!movingId} className={inputStyle+" mt-1"} value={row.etapa} onChange={e=>void changeStage(row,e.target.value as Stage)}>{stages.map(s=><option key={s} value={s}>{names[s]}</option>)}</select>
+         </label>
+        </article>)}
+        {!items.length&&<p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">{loading?"Cargando…":dragId?"Suelta aquí":"Sin oportunidades"}</p>}
+       </div>
+      </div>})}
+     </div>
+    </div>
    </section>
    {rows.length===500&&<p className="text-sm text-amber-700">Mostrando las primeras 500 oportunidades. Se agregará paginación en una próxima mejora.</p>}
   </div>
