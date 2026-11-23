@@ -452,7 +452,7 @@ export default function ContactosPage() {
             </div>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Dirección (opcional)
               <textarea value={form.direccion} onChange={e => update("direccion", e.target.value)}
-                rows={3} maxLength={2000} disabled={!editMode || saving} disabled={!editMode || saving} className={field + (!editMode ? " bg-slate-50 text-slate-700" : "")}
+                rows={3} maxLength={2000} disabled={!editMode || saving} className={field + (!editMode ? " bg-slate-50 text-slate-700" : "")}
                 placeholder="Escribe la dirección completa o las referencias que necesites, sin separar campos." />
               <span className="text-xs font-normal text-slate-500">Texto libre: calle, colonia, ciudad y referencias, como prefieras.</span>
             </label>
@@ -462,7 +462,7 @@ export default function ContactosPage() {
           </div>
 
           </>}
-          {(!selected || tab==="datos") && <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
+          {(!selected || tab==="datos") && <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>}
         </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno, búsqueda global, CSV y vinculación con prospectos. Sin importación ni integraciones externas.</p>
       </div>
