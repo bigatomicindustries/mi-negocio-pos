@@ -8,7 +8,7 @@ type LinkRow = { demo_request_id: string | null; lead_id: string | null; created
 type Prospecto = { id: string; fuente: "demo" | "lead"; nombre: string | null; negocio: string | null; estado: string };
 type Item = { fuente: "demo" | "lead"; id: string; created_at: string; prospecto: Prospecto | null };
 
-export default function ContactProspects({ contactId }: { contactId: string }) {
+export default function ContactProspects({ contactId, warnUnsaved = false }: { contactId: string; warnUnsaved?: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -63,7 +63,8 @@ export default function ContactProspects({ contactId }: { contactId: string }) {
           <p className="text-xs text-slate-500">{item.fuente === "demo" ? "Landing" : "Formulario"} · Estado: {item.prospecto?.estado || "No disponible"}</p>
         </div>
         <Link className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
-          href={`/superadmin/prospectos?fuente=${item.fuente}&id=${encodeURIComponent(item.id)}`}>
+          href={`/superadmin/prospectos?fuente=${item.fuente}&id=${encodeURIComponent(item.id)}`}
+          onClick={e => { if (warnUnsaved && !window.confirm("¿Salir sin guardar los cambios de este contacto?")) e.preventDefault(); }}>
           Abrir seguimiento
         </Link>
       </li>)}</ul>}
