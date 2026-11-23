@@ -375,7 +375,7 @@ export default function ContactosPage() {
             </div>
           ) : undefined}
         >
-          {selected && <ContactProspects key={selected.id} contactId={selected.id} />}
+          {selected && <ContactProspects key={selected.id} contactId={selected.id} warnUnsaved={hasChanges} />}
           <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
               {key === "nombre" ? "Nombre" : key === "apellido" ? "Apellido" : "Empresa o tienda"}
