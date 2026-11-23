@@ -86,11 +86,6 @@ export default function OportunidadesPage(){
      <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Oportunidades</span>
     </div><div aria-hidden="true" className="hidden md:block"/>
    </nav>
-   <header className="rounded-3xl bg-gradient-to-br from-slate-950 to-emerald-950 p-8 text-white">
-    <p className="text-sm font-bold uppercase tracking-widest text-emerald-300">MI NEGOCIO · CRM 1.6 · DEV</p>
-    <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Pipeline de oportunidades</h1>
-    <p className="mt-3 text-slate-200">Gestiona negociaciones vinculadas a tus contactos, desde el primer interés hasta el cierre.</p>
-   </header>
    {error&&<div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</div>}
    {notice&&<div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">{notice}</div>}
    <section aria-label="Herramientas de oportunidades" className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end">
