@@ -52,6 +52,7 @@ export default function CentroTrabajoPage() {
   const { cargando: authLoading, esPlatformAdmin } = useAuth();
   const [hoy, setHoy] = useState(diaMexico);
   const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [contactosVinculados, setContactosVinculados] = useState<Record<string, string>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -80,7 +81,25 @@ export default function CentroTrabajoPage() {
         setError("Hay más de 1000 prospectos abiertos. Se necesita paginación antes de mostrar un listado completo.");
         setTareas([]);
       } else {
-        setTareas((resultado.data ?? []) as Tarea[]);
+        const lista = (resultado.data ?? []) as Tarea[];
+        const demos = lista.filter(t => t.fuente === "demo").map(t => t.id);
+        const leads = lista.filter(t => t.fuente === "lead").map(t => t.id);
+        const [demoLinks, leadLinks] = await Promise.all([
+          demos.length ? supabase.from("crm_prospecto_contactos").select("demo_request_id,contacto_id").in("demo_request_id", demos) : Promise.resolve({data:[],error:null}),
+          leads.length ? supabase.from("crm_prospecto_contactos").select("lead_id,contacto_id").in("lead_id", leads) : Promise.resolve({data:[],error:null}),
+        ]);
+        if (cancelado) return;
+        if (demoLinks.error || leadLinks.error) {
+          setError("No se pudieron consultar los contactos vinculados. Intenta actualizar.");
+          setTareas([]);
+          setContactosVinculados({});
+        } else {
+          const vinculos: Record<string,string> = {};
+          for (const row of demoLinks.data ?? []) if (row.demo_request_id) vinculos["demo:" + row.demo_request_id] = row.contacto_id;
+          for (const row of leadLinks.data ?? []) if (row.lead_id) vinculos["lead:" + row.lead_id] = row.contacto_id;
+          setContactosVinculados(vinculos);
+          setTareas(lista);
+        }
       }
       setCargando(false);
     }
@@ -177,13 +196,17 @@ export default function CentroTrabajoPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {telefonoValido && <a href={`https://wa.me/${telefono.length === 10 ? "52" + telefono : telefono}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100">WhatsApp</a>}
+                    {contactosVinculados[t.fuente + ":" + t.id] && <>
+                      <Link href={"/superadmin/contactos?contacto=" + encodeURIComponent(contactosVinculados[t.fuente + ":" + t.id])} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">Ver contacto</Link>
+                      <Link href={"/superadmin/oportunidades?contacto=" + encodeURIComponent(contactosVinculados[t.fuente + ":" + t.id])} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">+ Oportunidad</Link>
+                    </>}
                     <Link href="/superadmin/prospectos" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">Abrir seguimiento</Link>
                   </div>
                 </li>;
               })}
             </ul>}
         </section>
-        <p className="text-xs text-slate-500">Versión inicial de solo lectura. Las modificaciones y el historial se gestionan en Seguimiento de prospectos. No envía mensajes ni crea recordatorios automáticamente.</p>
+        <p className="text-xs text-slate-500">Vista de consulta con accesos a contactos vinculados y creación de oportunidades. Las modificaciones y el historial se gestionan en Seguimiento de prospectos. No envía mensajes ni crea recordatorios automáticamente.</p>
       </div>
     </main>
   );
