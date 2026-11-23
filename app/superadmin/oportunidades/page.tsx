@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import OpportunityActivities from "@/components/crm/OpportunityActivities";
+import OpportunityTasks from "@/components/crm/OpportunityTasks";
 
 const stages = ["nuevo", "contactado", "propuesta", "negociacion", "ganado", "perdido"] as const;
 type Stage = typeof stages[number];
@@ -134,6 +135,7 @@ export default function OportunidadesPage(){
      <label className="text-sm font-medium sm:col-span-2">Notas<input className={inputStyle+" mt-1"} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Detalles relevantes"/></label>
      <button type="button" onClick={closeForm} disabled={saving} className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="submit" disabled={saving||!contacts.length||(!!editingId&&!dirty)} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{saving?"Guardando…":editingId?"Guardar cambios":"+ Crear oportunidad"}</button>
     </form>
+    {editingId&&<OpportunityTasks key={"tasks:"+editingId} opportunityId={editingId}/>}
     {editingId&&<OpportunityActivities key={editingId} opportunityId={editingId}/>}
     </div>
    </div>}
