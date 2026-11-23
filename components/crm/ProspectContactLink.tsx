@@ -209,7 +209,7 @@ export default function ProspectContactLink({
     {!loading && !linked && <div className="mt-4 space-y-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" className={mode === "search" ? primary : secondary} disabled={working || disabled}
-          onClick={() => { setMode(mode === "search" ? "none" : "search"); setError(""); }}>
+          onClick={() => { if (mode !== "search") setSearch(prospecto.whatsapp || prospecto.email || prospecto.nombre || ""); setMode(mode === "search" ? "none" : "search"); setError(""); }}>
           Vincular contacto existente
         </button>
         <button type="button" className={mode === "create" ? primary : secondary} disabled={working || disabled}
@@ -219,6 +219,14 @@ export default function ProspectContactLink({
       </div>
       {mode === "none" && <p className="text-xs text-slate-600">Si el correo o teléfono ya existe en el directorio, elige «Vincular contacto existente».</p>}
       {mode === "search" && <div className="space-y-3 rounded-lg bg-white p-3">
+        <div className="flex flex-wrap gap-2">
+          {prospecto.whatsapp && <button type="button" className={secondary} disabled={working || disabled}
+            onClick={() => setSearch(prospecto.whatsapp ?? "")}>Buscar teléfono del prospecto</button>}
+          {prospecto.email && <button type="button" className={secondary} disabled={working || disabled}
+            onClick={() => setSearch(prospecto.email ?? "")}>Buscar correo del prospecto</button>}
+          <button type="button" className={secondary} disabled={working || disabled}
+            onClick={() => setSearch("")}>Ver recientes</button>
+        </div>
         <label className="block text-xs font-semibold text-slate-700">Buscar por nombre, empresa, correo o teléfono
           <input className={field} maxLength={120} value={search} onChange={e => { setSearch(e.target.value); setError(""); }}
             placeholder="Buscar en todo el directorio" disabled={working || disabled}/>
