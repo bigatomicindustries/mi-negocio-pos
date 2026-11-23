@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import CrmModal from "@/components/crm/CrmModal";
+import ContactProspects from "@/components/crm/ContactProspects";
 
 type Medio = { id: string; tipo: "correo" | "telefono"; valor: string; valor_normalizado: string; es_principal: boolean };
 type Contacto = { id: string; nombre: string | null; apellido: string | null; empresa: string | null; direccion: string | null; notas: string | null; created_at: string; updated_at: string; archivado_at: string | null; crm_contacto_medios: Medio[] };
@@ -105,6 +106,26 @@ export default function ContactosPage() {
     void load();
     return () => { cancelled = true; };
   }, [cargando, esPlatformAdmin, archived, debouncedQuery, page, revision]);
+
+  useEffect(() => {
+    if (cargando || !esPlatformAdmin) return;
+    const id = new URLSearchParams(window.location.search).get("contacto");
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    let cancelled = false;
+    async function openLinkedContact() {
+      const { data, error: err } = await supabase.from("crm_contactos")
+        .select("id,nombre,apellido,empresa,direccion,notas,created_at,updated_at,archivado_at,crm_contacto_medios(id,tipo,valor,valor_normalizado,es_principal)")
+        .eq("id", id).eq("ambito", "plataforma").maybeSingle();
+      if (cancelled) return;
+      if (err || !data) {
+        setError(err?.message || "No se encontró el contacto vinculado.");
+        return;
+      }
+      open(data as Contacto);
+    }
+    void openLinkedContact();
+    return () => { cancelled = true; };
+  }, [cargando, esPlatformAdmin]);
 
   function open(c: Contacto | null) {
     setSelected(c);
@@ -354,6 +375,7 @@ export default function ContactosPage() {
             </div>
           ) : undefined}
         >
+          {selected && <ContactProspects key={selected.id} contactId={selected.id} />}
           <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
               {key === "nombre" ? "Nombre" : key === "apellido" ? "Apellido" : "Empresa o tienda"}
@@ -408,7 +430,7 @@ export default function ContactosPage() {
           </div>
           <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>
         </CrmModal>
-        <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Búsqueda global y exportación CSV local. Sin importación ni integración externa todavía.</p>
+        <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno, búsqueda global, CSV y vinculación con prospectos. Sin importación ni integraciones externas.</p>
       </div>
     </main>
   );
