@@ -64,23 +64,25 @@ function NegocioCRMContent(){
   const v=Number(amount);
   if(!title.trim()||title.trim().length>240||!contacts.some(c=>c.id===contact)||!Number.isFinite(v)||v<0){setError("Revisa el título, contacto y valor.");return;}
   setSaving(true);setError("");setNotice("");
-  const r=await supabase.from("crm_negocio_oportunidades").insert({business_id:negocio.id,contacto_id:contact,titulo:title.trim(),valor_estimado:v,created_by:user.id});
+  const r=await supabase.from("crm_negocio_oportunidades").insert({business_id:negocio.id,contacto_id:contact,titulo:title.trim(),valor_estimado:v,created_by:user.id}).select("id");
   if(r.error)setError("No se pudo crear la oportunidad: "+r.error.message);
+  else if(!r.data?.length)setError("No se confirmó la creación. Revisa tus permisos.");
   else{setTitle("");setContact("");setAmount("0");setNotice("Oportunidad creada.");await load();}
   setSaving(false);
  }
  async function changeStage(id:string,etapa:CRMStage){
   if(!allowed||saving||!stages.includes(etapa))return;setSaving(true);setError("");
-  const r=await supabase.from("crm_negocio_oportunidades").update({etapa,updated_at:new Date().toISOString()}).eq("id",id).eq("business_id",negocio!.id);
-  if(r.error)setError("No se pudo actualizar la etapa: "+r.error.message);else await load();
+  const r=await supabase.from("crm_negocio_oportunidades").update({etapa,updated_at:new Date().toISOString()}).eq("id",id).eq("business_id",negocio!.id).select("id");
+  if(r.error)setError("No se pudo actualizar la etapa: "+r.error.message);else if(!r.data?.length)setError("No se actualizó la etapa. Verifica tus permisos o si la oportunidad existe.");else await load();
   setSaving(false);
  }
  async function addTask(e:React.FormEvent){
   e.preventDefault();if(!allowed||saving||!user||!opps.some(o=>o.id===taskOpp))return;
   const d=new Date(taskDue);if(!taskTitle.trim()||taskTitle.trim().length>240||!taskDue||Number.isNaN(d.getTime())){setError("Indica tarea y fecha válidas.");return;}
   setSaving(true);setError("");setNotice("");
-  const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id});
-  if(r.error)setError("No se pudo crear la tarea: "+r.error.message);else{setTaskTitle("");setTaskDue("");setTaskOpp("");setNotice("Tarea programada.");await load();}
+  const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id}).select("id");
+  if(r.error)setError("No se pudo crear la tarea: "+r.error.message);
+  else if(!r.data?.length)setError("No se confirmó la creación de la tarea. Revisa tus permisos.");else{setTaskTitle("");setTaskDue("");setTaskOpp("");setNotice("Tarea programada.");await load();}
   setSaving(false);
  }
  async function createOpportunityTask(opportunityId:string,taskName:string,dueLocal:string):Promise<string|null>{
@@ -89,8 +91,9 @@ function NegocioCRMContent(){
   if(!taskName.trim()||taskName.trim().length>240||!dueLocal||Number.isNaN(due.getTime()))return "Indica una tarea y una fecha válidas.";
   setSaving(true);
   try{
-   const result=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:opportunityId,titulo:taskName.trim(),vence_at:due.toISOString(),created_by:user.id});
+   const result=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:opportunityId,titulo:taskName.trim(),vence_at:due.toISOString(),created_by:user.id}).select("id");
    if(result.error)return "No se pudo crear el seguimiento: "+result.error.message;
+   if(!result.data?.length)return "No se confirmó la creación del seguimiento. Revisa tus permisos.";
    await load();
    return null;
   }catch{return "No se pudo guardar el seguimiento. Inténtalo de nuevo.";}
@@ -98,8 +101,8 @@ function NegocioCRMContent(){
  }
  async function toggleTask(t:Task){
   if(!allowed||saving)return;setSaving(true);setError("");
-  const r=await supabase.from("crm_negocio_tareas").update({completada_at:t.completada_at?null:new Date().toISOString()}).eq("id",t.id);
-  if(r.error)setError("No se pudo actualizar la tarea: "+r.error.message);else await load();
+  const r=await supabase.from("crm_negocio_tareas").update({completada_at:t.completada_at?null:new Date().toISOString()}).eq("id",t.id).select("id");
+  if(r.error)setError("No se pudo actualizar la tarea: "+r.error.message);else if(!r.data?.length)setError("No se actualizó la tarea. Verifica tus permisos o si todavía existe.");else await load();
   setSaving(false);
  }
  if(cargando||checking)return <main className="mx-auto max-w-6xl p-8">Validando acceso al CRM…</main>;
