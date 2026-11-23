@@ -1,0 +1,13 @@
+"use client";
+import Link from "next/link";
+import {usePathname} from "next/navigation";
+export type CRMSection="resumen"|"contactos"|"oportunidades"|"trabajo";
+const tabs:{id:CRMSection;label:string}[]=[{id:"resumen",label:"Resumen"},{id:"contactos",label:"Contactos"},{id:"oportunidades",label:"Oportunidades"},{id:"trabajo",label:"Centro de trabajo"}];
+export default function CRMWorkspace({basePath,section,children,subtitle}:{basePath:string;section:CRMSection;children:React.ReactNode;subtitle:string}){
+ const pathname=usePathname();
+ return <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 md:px-8">
+  <header><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Mi Negocio · CRM</p><h1 className="mt-2 text-3xl font-bold text-slate-900">Relaciones comerciales</h1><p className="mt-1 text-slate-600">{subtitle}</p></header>
+  <nav aria-label="Secciones del CRM" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">{tabs.map(tab=><Link key={tab.id} href={basePath+"?seccion="+tab.id} aria-current={section===tab.id?"page":undefined} className={"rounded-xl px-4 py-2 text-sm font-semibold transition-colors "+(section===tab.id?"bg-slate-900 text-white":"bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800")}>{tab.label}</Link>)}</nav>
+  {children}
+ </main>;
+}
