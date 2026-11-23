@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import CrmModal from "@/components/crm/CrmModal";
 
 type Medio = { id: string; tipo: "correo" | "telefono"; valor: string; valor_normalizado: string; es_principal: boolean };
 type Contacto = { id: string; nombre: string | null; apellido: string | null; empresa: string | null; notas: string | null; created_at: string; updated_at: string; archivado_at: string | null; crm_contacto_medios: Medio[] };
@@ -234,13 +235,14 @@ export default function ContactosPage() {
             <button type="button" disabled={loading || (page + 1) * 25 >= total} onClick={() => setPage(p => p + 1)} className={btn}>Siguiente</button>
           </div>
         </section>
-        {editing && <section aria-label="Formulario de contacto" className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-md sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Ficha de contacto</p>
-              <h2 className="mt-2 text-2xl font-bold">{selected ? "Editar contacto" : "Nuevo contacto"}</h2></div>
-            <button type="button" disabled={saving} onClick={() => setEditing(false)} className={btn}>Cerrar</button>
-          </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <CrmModal
+          open={editing}
+          title={selected ? "Editar contacto" : "Nuevo contacto"}
+          description="Ficha de contacto · Directorio interno"
+          onClose={() => setEditing(false)}
+          busy={saving}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
             {(["nombre", "apellido", "empresa"] as const).map(key => <label key={key} className="text-sm font-semibold text-slate-700">
               {key === "nombre" ? "Nombre" : key === "apellido" ? "Apellido" : "Empresa o tienda"}
               <input value={form[key]} maxLength={key === "empresa" ? 180 : 120} onChange={e => update(key, e.target.value)} className={field} />
@@ -272,7 +274,7 @@ export default function ContactosPage() {
             <button type="button" disabled={saving} onClick={() => setEditing(false)} className={btn}>Cancelar</button>
           </div>
           <p className="mt-4 text-xs text-slate-500">Versión DEV: el guardado de datos y medios no es atómico. Si aparece un error, revisa el contacto antes de reintentar.</p>
-        </section>}
+        </CrmModal>
         <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno. Sin exportación, importación ni integración externa todavía.</p>
       </div>
     </main>
