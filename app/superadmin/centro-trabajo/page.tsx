@@ -200,7 +200,7 @@ export default function CentroTrabajoPage() {
                       <Link href={"/superadmin/contactos?contacto=" + encodeURIComponent(contactosVinculados[t.fuente + ":" + t.id])} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">Ver contacto</Link>
                       <Link href={"/superadmin/oportunidades?contacto=" + encodeURIComponent(contactosVinculados[t.fuente + ":" + t.id])} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">+ Oportunidad</Link>
                     </>}
-                    <Link href="/superadmin/prospectos" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">Abrir seguimiento</Link>
+                    <Link href={`/superadmin/prospectos?fuente=${encodeURIComponent(t.fuente)}&id=${encodeURIComponent(t.id)}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50">Abrir seguimiento</Link>
                   </div>
                 </li>;
               })}
