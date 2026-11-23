@@ -55,6 +55,9 @@ export default function ProspectContactLink({
     correo: prospecto.email ?? "", telefono: prospecto.whatsapp ?? "",
   });
   const foreignKey = prospecto.fuente === "demo" ? "demo_request_id" : "lead_id";
+  const phoneDigits = (prospecto.whatsapp ?? "").replace(/\D/g, "");
+  const phoneQuery = /^521\d{10}$/.test(phoneDigits) ? phoneDigits.slice(3)
+    : /^52\d{10}$/.test(phoneDigits) ? phoneDigits.slice(2) : phoneDigits;
 
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +214,7 @@ export default function ProspectContactLink({
     {!loading && !linked && <div className="mt-4 space-y-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" className={mode === "search" ? primary : secondary} disabled={working || disabled}
-          onClick={() => { if (mode !== "search") setSearch(prospecto.whatsapp || prospecto.email || prospecto.nombre || ""); setMode(mode === "search" ? "none" : "search"); setError(""); }}>
+          onClick={() => { if (mode !== "search") setSearch(phoneQuery || prospecto.email || prospecto.nombre || ""); setMode(mode === "search" ? "none" : "search"); setError(""); }}>
           Vincular contacto existente
         </button>
         <button type="button" className={mode === "create" ? primary : secondary} disabled={working || disabled}
@@ -223,7 +226,7 @@ export default function ProspectContactLink({
       {mode === "search" && <div className="space-y-3 rounded-lg bg-white p-3">
         <div className="flex flex-wrap gap-2">
           {prospecto.whatsapp && <button type="button" className={secondary} disabled={working || disabled}
-            onClick={() => setSearch(prospecto.whatsapp ?? "")}>Buscar teléfono del prospecto</button>}
+            onClick={() => setSearch(phoneQuery)}>Buscar teléfono del prospecto</button>}
           {prospecto.email && <button type="button" className={secondary} disabled={working || disabled}
             onClick={() => setSearch(prospecto.email ?? "")}>Buscar correo del prospecto</button>}
           <button type="button" className={secondary} disabled={working || disabled}
