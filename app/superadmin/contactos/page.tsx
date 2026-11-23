@@ -297,10 +297,15 @@ export default function ContactosPage() {
   return (
     <main className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-7">
-        <nav className="flex flex-wrap gap-5 text-sm font-semibold">
-          <Link href="/superadmin/tablero" className="text-slate-600 hover:text-emerald-700">← Tablero comercial</Link>
-          <Link href="/superadmin/prospectos" className="text-emerald-700 hover:underline">Seguimiento →</Link>
-          <Link href="/superadmin/centro-trabajo" className="text-emerald-700 hover:underline">Centro de trabajo →</Link>
+        <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-5">
+            <Link href="/superadmin/tablero" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">CRM</Link>
+            <Link href="/superadmin/prospectos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Prospectos</Link>
+            <Link href="/superadmin/centro-trabajo" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Centro de trabajo</Link>
+            <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Contactos</span>
+          </div>
+          <div aria-hidden="true" className="hidden md:block" />
         </nav>
         <header className="rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-9 text-white shadow-lg sm:px-9">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM 1.5 · DEV</p>
