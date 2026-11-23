@@ -47,6 +47,7 @@ export default function OportunidadesPage(){
  useEffect(()=>{if(!cargando&&esPlatformAdmin)void load();},[cargando,esPlatformAdmin,load]);
  useEffect(()=>{if(!showCreate)return;const previous=document.body.style.overflow;document.body.style.overflow="hidden";const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape"&&!saving)setShowCreate(false);if(e.key==="Tab"&&modalRef.current){const focusable=Array.from(modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])"));if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};document.addEventListener("keydown",onKey);modalRef.current?.querySelector<HTMLElement>("select")?.focus();return()=>{document.body.style.overflow=previous;document.removeEventListener("keydown",onKey);openButtonRef.current?.focus();};},[showCreate,saving]);
  const normalize=(s:string)=>s.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLocaleLowerCase("es-MX");
+ useEffect(()=>{const id=new URLSearchParams(window.location.search).get("ver_contacto");if(id)setFilterContactId(id);},[]);
  useEffect(()=>{if(loading||!contacts.length)return;const id=new URLSearchParams(window.location.search).get("contacto");if(!id)return;const found=contacts.some(c=>c.id===id);if(found){setContactId(id);setShowCreate(true);}else setError("El contacto solicitado no está disponible o está archivado.");window.history.replaceState(null,"",window.location.pathname);},[loading,contacts]);
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre":"Contacto no disponible";};
  async function create(e:React.FormEvent<HTMLFormElement>){
@@ -89,6 +90,7 @@ export default function OportunidadesPage(){
    </nav>
    {error&&<div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</div>}
    {notice&&<div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">{notice}</div>}
+   {filterContactId&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><p><strong>Filtro por contacto:</strong> {contactName(filterContactId)} · {rows.filter(x=>x.contacto_id===filterContactId).length} oportunidades</p><button type="button" className="rounded-lg border border-emerald-300 bg-white px-3 py-2 font-semibold hover:bg-emerald-100" onClick={()=>{setFilterContactId("");window.history.replaceState(null,"",window.location.pathname);}}>Ver todas las oportunidades</button></div>}
    <section aria-label="Herramientas de oportunidades" className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end">
     <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700">Buscar oportunidades
      <input type="search" value={search} onChange={e=>setSearch(e.target.value)} className={inputStyle+" mt-2"} placeholder="Nombre de contacto, empresa u oportunidad…" aria-label="Buscar oportunidades"/>
@@ -119,7 +121,7 @@ export default function OportunidadesPage(){
     </div>
     <div className="overflow-x-auto pb-4" tabIndex={0} aria-label="Desplazamiento horizontal del pipeline">
      <div className="flex min-w-max items-start gap-4">
-      {stages.map(stage=>{const items=rows.filter(x=>x.etapa===stage&&(!search.trim()||normalize([x.titulo,contactName(x.contacto_id),contacts.find(c=>c.id===x.contacto_id)?.empresa||""].join(" ")).includes(normalize(search.trim()))));return <div key={stage}
+      {stages.map(stage=>{const items=rows.filter(x=>x.etapa===stage&&(!filterContactId||x.contacto_id===filterContactId)&&(!search.trim()||normalize([x.titulo,contactName(x.contacto_id),contacts.find(c=>c.id===x.contacto_id)?.empresa||""].join(" ")).includes(normalize(search.trim()))));return <div key={stage}
        onDragOver={e=>{if(dragId){e.preventDefault();e.dataTransfer.dropEffect="move";setOverStage(stage);}}}
        onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOverStage(null);}}
        onDrop={e=>{e.preventDefault();dropOn(stage);}}
