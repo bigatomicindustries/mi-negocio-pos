@@ -427,6 +427,7 @@ export default function TableroComercialPage() {
           <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-5">
             <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">CRM</span>
+            <Link href="/superadmin/oportunidades" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Oportunidades</Link>
             <Link href="/superadmin/prospectos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Prospectos</Link>
             <Link href="/superadmin/centro-trabajo" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Centro de trabajo</Link>
             <Link href="/superadmin/contactos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Contactos</Link>
