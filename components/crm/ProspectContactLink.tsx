@@ -31,12 +31,13 @@ const primary = "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-
 const nombreContacto = (c: Contacto) => [c.nombre, c.apellido].filter(Boolean).join(" ") || c.empresa || "Contacto sin nombre";
 
 export default function ProspectContactLink({
-  prospecto, disabled = false, onBusyChange, onChange,
+  prospecto, disabled = false, onBusyChange, onChange, warnUnsaved = false,
 }: {
   prospecto: Prospecto;
   disabled?: boolean;
   onBusyChange: (busy: boolean) => void;
   onChange?: () => void;
+  warnUnsaved?: boolean;
 }) {
   const [linked, setLinked] = useState<Contacto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +203,8 @@ export default function ProspectContactLink({
         <p className="text-xs text-slate-500">{linked.empresa || "Sin empresa"}{linked.archivado_at ? " · Archivado" : ""}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link href={`/superadmin/contactos?contacto=${encodeURIComponent(linked.id)}`} className={secondary}>Ver ficha</Link>
+        <Link href={`/superadmin/contactos?contacto=${encodeURIComponent(linked.id)}`} className={secondary}
+          onClick={e => { if (warnUnsaved && !window.confirm("¿Salir sin guardar el seguimiento o la actividad pendiente?")) e.preventDefault(); }}>Ver ficha</Link>
         <button type="button" className={secondary} disabled={working || disabled} onClick={unlink}>Desvincular</button>
       </div>
     </div>}
