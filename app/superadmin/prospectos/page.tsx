@@ -108,6 +108,7 @@ export default function ProspectosPage() {
   const [rows, setRows] = useState<Prospecto[]>([]);
   const [linkedKeys, setLinkedKeys] = useState<Set<string>>(() => new Set());
   const [linkListError, setLinkListError] = useState("");
+  const [openingOpportunity, setOpeningOpportunity] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -288,6 +289,27 @@ export default function ProspectosPage() {
     setPage(0);
   }
 
+  async function openOpportunity(p: Prospecto) {
+    const key = p.fuente + ":" + p.id;
+    if (openingOpportunity) return;
+    if (!linkedKeys.has(key)) {
+      open(p);
+      setLinkListError("Primero vincula este prospecto con un contacto desde su ficha de seguimiento; después podrás crear la oportunidad.");
+      return;
+    }
+    setOpeningOpportunity(key);
+    setLinkListError("");
+    const foreignKey = p.fuente === "demo" ? "demo_request_id" : "lead_id";
+    const { data, error: relationError } = await supabase.from("crm_prospecto_contactos")
+      .select("contacto_id").eq(foreignKey, p.id).maybeSingle();
+    if (relationError || !data?.contacto_id) {
+      setLinkListError("No se pudo obtener el contacto vinculado. Actualiza la página y vuelve a intentarlo.");
+    } else {
+      router.push("/superadmin/oportunidades?contacto=" + encodeURIComponent(data.contacto_id));
+    }
+    setOpeningOpportunity(null);
+  }
+
   function open(p: Prospecto) {
     setLinkBusy(false);
     setSelected(p);
@@ -464,6 +486,7 @@ export default function ProspectosPage() {
                       <td className="px-4 py-4"><div className="flex gap-2">
                         {url && <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-green-50 px-3 py-2 font-semibold text-green-700">WhatsApp</a>}
                         <button type="button" onClick={() => open(p)} className="whitespace-nowrap rounded-lg bg-slate-100 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-200">Seguimiento</button>
+                        <button type="button" disabled={Boolean(openingOpportunity)} onClick={() => void openOpportunity(p)} className="whitespace-nowrap rounded-lg bg-emerald-50 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50">{openingOpportunity === p.fuente + ":" + p.id ? "Abriendo…" : "+ Oportunidad"}</button>
                       </div></td>
                     </tr>;
                   })}</tbody>
