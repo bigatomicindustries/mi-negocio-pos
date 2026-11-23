@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import CrmModal from "@/components/crm/CrmModal";
 
 const estados = {
   nuevo: "Nuevo",
@@ -420,14 +421,14 @@ export default function ProspectosPage() {
           </div>
         </section>
 
-        {selected && <section className="space-y-6 rounded-2xl border bg-white p-5 sm:p-6" aria-label="Seguimiento del prospecto">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">{selected.negocio || selected.nombre || "Solicitud de demo"}</h2>
-              <p className="mt-1 text-sm text-slate-600">{selected.whatsapp || "Sin WhatsApp"} · {selected.email || "Sin correo"}</p>
-            </div>
-            <button type="button" disabled={saving || activitySaving} onClick={() => setSelected(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">Cerrar</button>
-          </div>
+        {selected && <CrmModal
+          open={true}
+          title={selected.negocio || selected.nombre || "Solicitud de demo"}
+          description={`${selected.whatsapp || "Sin WhatsApp"} · ${selected.email || "Sin correo"}`}
+          onClose={() => setSelected(null)}
+          busy={saving || activitySaving}
+          size="lg"
+        >
           {selected.comentarios && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{selected.comentarios}</p>}
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
@@ -490,7 +491,7 @@ export default function ProspectosPage() {
                 </li>
               ))}</ol>}
           </div>
-        </section>}
+        </CrmModal>}
       </div>
     </main>
   );
