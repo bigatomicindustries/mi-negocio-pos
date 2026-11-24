@@ -442,7 +442,7 @@ export default function TableroComercialPage() {
             <div className="max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.17em] text-emerald-200">
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                Mi Negocio · CRM 1.3 · DEV
+                Mi Negocio · CRM
               </p>
               <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Tu operación comercial, <span className="text-emerald-300">en perspectiva.</span></h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
@@ -455,7 +455,6 @@ export default function TableroComercialPage() {
             </Link>
           </div>
           <div className="relative mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 text-xs text-slate-300">
-            <span className="rounded-full bg-white/10 px-3 py-1.5">Entorno de desarrollo</span>
             <span>Zona horaria: Ciudad de México</span>
             <span aria-hidden="true" className="hidden text-white/30 sm:inline">•</span>
             <span>Último corte: {ultimaActualizacion ? fechaHora(ultimaActualizacion.toISOString()) : "Por calcular"}</span>
@@ -709,7 +708,7 @@ export default function TableroComercialPage() {
         </section>
 
         <footer className="flex flex-wrap justify-between gap-3 pb-4 text-xs leading-5 text-slate-500">
-          <p>Mi Negocio CRM 1.3 · Entorno DEV · Tablero de consulta, sin cambios automáticos en prospectos.</p>
+          <p>Mi Negocio CRM · Tablero de consulta de prospectos.</p>
           <p>Las cifras de conversión son estados actuales; no equivalen a ventas facturadas.</p>
         </footer>
       </div>

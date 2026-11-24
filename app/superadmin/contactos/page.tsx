@@ -314,7 +314,7 @@ export default function ContactosPage() {
           <div aria-hidden="true" className="hidden md:block" />
         </nav>
         <header className="rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-9 text-white shadow-lg sm:px-9">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM 1.5 · DEV</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM</p>
           <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Contactos, <span className="text-emerald-300">sin complicaciones.</span></h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Personas y empresas en un solo directorio, con varios teléfonos y correos. El sistema bloquea nuevos datos duplicados.</p>
           <p className="mt-4 text-xs text-emerald-200">Directorio interno · Acceso para clientes desactivado</p>
@@ -462,9 +462,9 @@ export default function ContactosPage() {
           </div>
 
           </>}
-          {(!selected || tab==="datos") && <p className="mt-4 text-xs text-slate-500">Guardado atómico en DEV: ficha, correos y teléfonos se confirman juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>}
+          {(!selected || tab==="datos") && <p className="mt-4 text-xs text-slate-500">La ficha, los correos y los teléfonos se guardan juntos. Si se pierde la conexión, actualiza la lista antes de reintentar.</p>}
         </CrmModal>
-        <p className="text-xs text-slate-500">CRM 1.5 · DEV · Directorio interno, búsqueda global, CSV y vinculación con prospectos. Sin importación ni integraciones externas.</p>
+        <p className="text-xs text-slate-500">CRM · Directorio interno, búsqueda global, exportación CSV y vinculación con prospectos.</p>
       </div>
     </main>
   );

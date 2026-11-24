@@ -189,7 +189,7 @@ export default function CentroTrabajoPage() {
           <div aria-hidden="true" className="hidden md:block" />
         </nav>
         <header className="rounded-3xl bg-gradient-to-br from-slate-950 to-emerald-950 px-6 py-9 text-white sm:px-9">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM 1.4 · DEV</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM</p>
           <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Centro de trabajo comercial</h1>
           <p className="mt-3 max-w-2xl text-slate-300">Empieza por los contactos vencidos, continúa con los de hoy y organiza los próximos seguimientos.</p>
           <p className="mt-4 text-xs text-slate-400">Zona horaria: Ciudad de México · Fecha de referencia: {hoy}</p>
