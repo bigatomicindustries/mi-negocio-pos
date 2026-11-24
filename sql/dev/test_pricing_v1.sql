@@ -30,6 +30,7 @@ begin
   insert into public.profiles(id,full_name,role,business_id) values(admin_id,'Fixture pricing','admin',biz);
   insert into public.subscriptions(business_id,plan_id) values(biz,orig);
 
+  insert into public.crm_acceso_negocios(business_id,habilitado) values(biz,true);
   execute 'set local role service_role';
   for price in select * from public.billing_prices where version='v1' loop
     update public.subscriptions set plan_id=orig, status='active', mercadopago_subscription_id=null where business_id=biz;
@@ -80,6 +81,8 @@ begin
     if not exists(select from public.subscriptions where business_id=biz and status='past_due') then raise exception 'stale event'; end if;
     perform public.billing_reconcile(cid,remote,3,'cancelled',price.amount_cents,'MXN',price.interval_months,null);
     if not exists(select from public.subscriptions where business_id=biz and status='cancelled') then raise exception 'cancellation'; end if;
+    if not exists(select from public.crm_acceso_negocios where business_id=biz and habilitado) then
+      raise exception 'existing CRM permission changed'; end if;
     tier_count := tier_count+1;
   end loop;
   if tier_count<>6 then raise exception 'six modes required'; end if;

@@ -22,6 +22,7 @@ const remotes = new Map();
 const invoices = new Map();
 const expected = { basic: [49,499], pro: [99,999], business: [199,1999] };
 let lastPayload;
+let resumedAttempt;
 const json = (body, status=200) => Response.json(body, {status});
 
 globalThis.fetch = async (input, init = {}) => {
@@ -41,6 +42,7 @@ globalThis.fetch = async (input, init = {}) => {
           amount_cents: expected[tier][Number(m===12)] * 100 });
       }
       case "/rest/v1/rpc/billing_begin": {
+        if (resumedAttempt) return json({id:resumedAttempt,create_remote:false});
         const id = randomUUID();
         contracts.set(id,{id,business_id:body.p_business,requested_by:body.p_actor,price_id:body.p_price});
         return json({id,create_remote:true});
@@ -69,6 +71,7 @@ globalThis.fetch = async (input, init = {}) => {
       remotes.set(id,remote);
       return json(remote,201);
     }
+    if (url.pathname === "/preapproval/search") return json({results:[...remotes.values()]});
     if (url.pathname.startsWith("/preapproval/")) return json(remotes.get(url.pathname.split("/").at(-1)) ?? {},200);
     if (url.pathname === "/authorized_payments/123") {
       const remote = [...remotes.values()].at(-1);
@@ -116,6 +119,17 @@ for (const [plan,prices] of Object.entries(expected)) {
     });
   }
 }
+test("recupera la referencia de un alta sin repetir el POST remoto",async()=>{
+  const first = await (await subscribe.POST(post({plan:"pro",interval:"annual"}))).json();
+  const count = remotes.size;
+  resumedAttempt = first.checkout_id;
+  try {
+    const second = await (await subscribe.POST(post({plan:"pro",interval:"annual"}))).json();
+    assert.equal(second.checkout_url,first.checkout_url);
+    assert.equal(second.checkout_id,first.checkout_id);
+    assert.equal(remotes.size,count);
+  } finally { resumedAttempt = undefined; }
+});
 test("rechaza notificación sin firma válida, sesión ausente y aplicación ajena",async()=>{
   const remote = [...remotes.values()].at(-1);
   assert.equal((await webhook.POST(notify("subscription_preapproval",remote.id,false))).status,401);
