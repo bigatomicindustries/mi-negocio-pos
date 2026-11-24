@@ -33,7 +33,7 @@ function NegocioCRMContent(){
  const [agendaRevision,setAgendaRevision]=useState(0),[pendingAlerts,setPendingAlerts]=useState(0);
  const [metrics,setMetrics]=useState<{counts:Record<string,number>;amounts:Record<string,number>;agenda:{counts:Record<string,number>;rows:(Task&{oportunidad_titulo:string})[]}}|null>(null);
  const [contactCount,setContactCount]=useState(0);
- const [contacts,setContacts]=useState<Contact[]>([]),[opps,setOpps]=useState<Opportunity[]>([]),[tasks,setTasks]=useState<Task[]>([]);
+ const [contacts,setContacts]=useState<Contact[]>([]);
  const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState(false);
  const [title,setTitle]=useState(""),[contact,setContact]=useState(""),[amount,setAmount]=useState("0");
  const [taskTitle,setTaskTitle]=useState(""),[taskDue,setTaskDue]=useState(""),[taskOpp,setTaskOpp]=useState("");
@@ -47,7 +47,7 @@ function NegocioCRMContent(){
  },[negocio?.id,user?.id]);
  const editSnapshot=(t:string,c:string,a:string,s:CRMStage)=>JSON.stringify([t.trim(),c,Number(a),s]);
  const editDirty=!!editing&&editSnapshot(editTitle,editContact,editAmount,editStage)!==editOriginal;
- function openOpportunity(id:string){const row=boardRows.find(o=>o.id===id)||opps.find(o=>o.id===id);if(!row)return;setEditing(row);setEditTitle(row.titulo);setEditContact(row.contacto_id);setEditAmount(String(row.valor_estimado));setEditStage(row.etapa as CRMStage);setEditOriginal(editSnapshot(row.titulo,row.contacto_id,String(row.valor_estimado),row.etapa as CRMStage));setEditError("");}
+ function openOpportunity(id:string){const row=boardRows.find(o=>o.id===id);if(!row)return;setEditing(row);setEditTitle(row.titulo);setEditContact(row.contacto_id);setEditAmount(String(row.valor_estimado));setEditStage(row.etapa as CRMStage);setEditOriginal(editSnapshot(row.titulo,row.contacto_id,String(row.valor_estimado),row.etapa as CRMStage));setEditError("");}
  function closeOpportunity(){if(saving)return;if(editDirty&&!window.confirm("¿Descartar cambios sin guardar?"))return;setEditing(null);setEditError("");}
  async function saveOpportunity(e:React.FormEvent){e.preventDefault();if(!editing||!editDirty||saving||!allowed||!negocio)return;const value=Number(editAmount);if(!editTitle.trim()||editTitle.trim().length>240||!editContact||!Number.isFinite(value)||value<0){setEditError("Revisa título, contacto y valor estimado.");return;}setSaving(true);setEditError("");try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_oportunidades").update({titulo:editTitle.trim(),contacto_id:editContact,valor_estimado:value,etapa:editStage,updated_at:new Date().toISOString()}).eq("id",editing.id).eq("business_id",negocio.id).select("id");if(r.error)setEditError("No se pudo guardar: "+r.error.message);else if(!r.data?.length)setEditError("No se actualizó el registro. Revisa tus permisos.");else{setEditing(null);setNotice("Oportunidad actualizada.");await load();}}catch{setEditError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}}
 
@@ -55,21 +55,19 @@ function NegocioCRMContent(){
   if(!negocio?.id)return;
   setLoading(true);setError("");
   try{
-  const [count,o,t]=await Promise.all([
-   supabase.from("crm_contactos").select("id",{count:"exact",head:true}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null),
-   supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,created_at").eq("business_id",negocio.id).order("created_at",{ascending:false}).limit(500),
-   supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,completada_at").order("vence_at",{ascending:true}).limit(500)
+  const [count]=await Promise.all([
+   supabase.from("crm_contactos").select("id",{count:"exact",head:true}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null)
   ]);
-  if(count.error||o.error||t.error){setError("No fue posible cargar el CRM: "+(count.error||o.error||t.error)?.message);return;}
+  if(count.error){setError("No fue posible cargar el CRM: "+count.error.message);return;}
   const board=section==="oportunidades"?await Promise.all(stages.map(stage=>{const start=((boardPages[stage]||1)-1)*25;return supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,created_at",{count:"exact"}).eq("business_id",negocio.id).eq("etapa",stage).order("created_at",{ascending:false}).order("id",{ascending:false}).range(start,start+24);})):null;
   if(board?.some(r=>r.error)){setError("No fue posible cargar el tablero comercial.");return;}
   const nextRows=board?.flatMap(r=>r.data||[])||[];
   if(board){const counts=Object.fromEntries(stages.map((s,i)=>[s,board[i].count||0]));setBoardCounts(counts);const corrected=Object.fromEntries(stages.map(s=>[s,Math.min(boardPages[s]||1,Math.max(1,Math.ceil(counts[s]/25)))]));if(stages.some(s=>corrected[s]!== (boardPages[s]||1)))setBoardPages(corrected);}
-  const ids=[...new Set([...(o.data||[]),...nextRows].map(row=>row.contacto_id))];
+  const ids=[...new Set(nextRows.map(row=>row.contacto_id))];
   const batches=await Promise.all(Array.from({length:Math.ceil(ids.length/100)},(_,i)=>supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("business_id",negocio.id).eq("ambito","negocio").is("archivado_at",null).in("id",ids.slice(i*100,(i+1)*100))));
   const failed=batches.find(r=>r.error);
   if(failed){setError("No fue posible cargar los contactos vinculados.");return;}
-  setAgendaRevision(v=>v+1);setBoardRows(nextRows);setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));setOpps(o.data||[]);setTasks(t.data||[]);
+  setAgendaRevision(v=>v+1);setBoardRows(nextRows);setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));
   }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
  },[negocio?.id,section,boardPages]);
  useEffect(()=>{
@@ -87,7 +85,7 @@ function NegocioCRMContent(){
   }
   void check();return()=>{cancelled=true;};
  },[cargando,user?.id,negocio?.id,perfil?.role]);
- useEffect(()=>{if(allowed)void load();else{setBoardRows([]);setBoardCounts({});setContactCount(0);setContacts([]);setOpps([]);setTasks([]);}},[allowed,load]);
+ useEffect(()=>{if(allowed)void load();else{setBoardRows([]);setBoardCounts({});setContactCount(0);setContacts([]);}},[allowed,load]);
  async function addOpportunity(e:React.FormEvent){
   e.preventDefault();if(!negocio||!user||saving||!allowed)return;
   const v=Number(amount);
@@ -106,7 +104,7 @@ function NegocioCRMContent(){
   }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function addTask(e:React.FormEvent){
-  e.preventDefault();if(!allowed||saving||!user||!opps.some(o=>o.id===taskOpp))return;
+  e.preventDefault();if(!allowed||saving||!user||!taskOpp)return;
   const d=new Date(taskDue);if(!taskTitle.trim()||taskTitle.trim().length>240||!taskDue||Number.isNaN(d.getTime())){setError("Indica tarea y fecha válidas.");return;}
   setSaving(true);setError("");setNotice("");
   try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id}).select("id");
@@ -115,7 +113,7 @@ function NegocioCRMContent(){
   }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function createOpportunityTask(opportunityId:string,taskName:string,dueLocal:string):Promise<string|null>{
-  if(!allowed||saving||!user||!negocio||![...opps,...boardRows].some(o=>o.id===opportunityId))return "No tienes permiso para crear este seguimiento.";
+  if(!allowed||saving||!user||!negocio||!opportunityId)return "No tienes permiso para crear este seguimiento.";
   const due=new Date(dueLocal);
   if(!taskName.trim()||taskName.trim().length>240||!dueLocal||Number.isNaN(due.getTime()))return "Indica una tarea y una fecha válidas.";
   setSaving(true);
@@ -171,9 +169,9 @@ function NegocioCRMContent(){
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-bold">Nueva oportunidad</h3><p className="mt-1 text-sm text-slate-500">Vincula una negociación a un contacto existente.</p><form onSubmit={addOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} value={title} onChange={e=>setTitle(e.target.value)} required/></label><ContactPicker businessId={negocio!.id} value={contact} onChange={setContact} disabled={saving}/><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} required/></label><button disabled={saving||!contact} className="w-full rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Crear oportunidad</button>{!contactCount&&<p className="text-sm text-amber-700">Necesitas un contacto registrado para crear oportunidades.</p>}</form></section>
    </div>
   </div>}
-  {editing&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10"><div role="dialog" aria-modal="true" aria-label="Editar oportunidad" className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Oportunidad comercial</h2><div className="flex gap-2">{editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button></div></div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} required value={editTitle} onChange={e=>setEditTitle(e.target.value)}/></label><ContactPicker key={editing.id} businessId={negocio!.id} value={editContact} onChange={setEditContact} disabled={saving}/><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Etapa<select className={input+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>{stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></label></form><OpportunityCommercialOverview contact={contacts.find(c=>c.id===editing.contacto_id)||null} tasks={tasks.filter(t=>t.oportunidad_id===editing.id)} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
-  {section==="contactos"&&<BusinessContacts businessId={negocio!.id} opportunities={opps} tasks={tasks} onSaved={load}/>}
-  {section==="trabajo"&&<BusinessTaskCenter businessId={negocio!.id} revision={agendaRevision} opportunities={opps} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
+  {editing&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10"><div role="dialog" aria-modal="true" aria-label="Editar oportunidad" className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Oportunidad comercial</h2><div className="flex gap-2">{editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button></div></div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} required value={editTitle} onChange={e=>setEditTitle(e.target.value)}/></label><ContactPicker key={editing.id} businessId={negocio!.id} value={editContact} onChange={setEditContact} disabled={saving}/><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Etapa<select className={input+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>{stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></label></form><OpportunityCommercialOverview key={editing.id} opportunityId={editing.id} revision={agendaRevision} contact={contacts.find(c=>c.id===editing.contacto_id)||null} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
+  {section==="contactos"&&<BusinessContacts businessId={negocio!.id} onSaved={load}/>}
+  {section==="trabajo"&&<BusinessTaskCenter businessId={negocio!.id} revision={agendaRevision} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
  </CRMWorkspace>;
 }
 export default function NegocioCRM(){return <Suspense fallback={<main className="p-8">Cargando CRM…</main>}><NegocioCRMContent/></Suspense>;}
