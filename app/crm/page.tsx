@@ -22,6 +22,7 @@ function NegocioCRMContent(){
  const requested=params.get("seccion");
  const section:CRMSection=requested==="contactos"||requested==="oportunidades"||requested==="trabajo"?requested:"resumen";
  const [allowed,setAllowed]=useState(false),[checking,setChecking]=useState(true),[loading,setLoading]=useState(false);
+ const [contactCount,setContactCount]=useState(0);
  const [contacts,setContacts]=useState<Contact[]>([]),[opps,setOpps]=useState<Opportunity[]>([]),[tasks,setTasks]=useState<Task[]>([]);
  const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState(false);
  const [title,setTitle]=useState(""),[contact,setContact]=useState(""),[amount,setAmount]=useState("0");
@@ -45,12 +46,12 @@ function NegocioCRMContent(){
   setLoading(true);setError("");
   try{
   const [c,o,t]=await Promise.all([
-   supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null).order("created_at",{ascending:false}).limit(500),
+   supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)",{count:"exact"}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null).order("created_at",{ascending:false}).limit(500),
    supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,created_at").eq("business_id",negocio.id).order("created_at",{ascending:false}).limit(500),
    supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,completada_at").order("vence_at",{ascending:true}).limit(500)
   ]);
   if(c.error||o.error||t.error){setError("No fue posible cargar el CRM: "+(c.error||o.error||t.error)?.message);}
-  else{setContacts(c.data||[]);setOpps(o.data||[]);setTasks(t.data||[]);}
+  else{setContactCount(c.count||0);setContacts(c.data||[]);setOpps(o.data||[]);setTasks(t.data||[]);}
   }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
  },[negocio?.id]);
  useEffect(()=>{
@@ -68,7 +69,7 @@ function NegocioCRMContent(){
   }
   void check();return()=>{cancelled=true;};
  },[cargando,user?.id,negocio?.id,perfil?.role]);
- useEffect(()=>{if(allowed)void load();else{setContacts([]);setOpps([]);setTasks([]);}},[allowed,load]);
+ useEffect(()=>{if(allowed)void load();else{setContactCount(0);setContacts([]);setOpps([]);setTasks([]);}},[allowed,load]);
  async function addOpportunity(e:React.FormEvent){
   e.preventDefault();if(!negocio||!user||saving||!allowed)return;
   const v=Number(amount);
@@ -130,7 +131,7 @@ function NegocioCRMContent(){
   {section==="resumen"&&<div className="space-y-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-900">Resumen comercial</h2><p className="mt-1 text-sm text-slate-500">Indicadores y próximos seguimientos de tu negocio</p></div><Link href="/crm?seccion=contactos" className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Gestionar contactos</Link></div>
    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
-    {label:"Contactos activos",value:contacts.length,detail:"Directorio comercial",href:"contactos"},
+    {label:"Contactos activos",value:contactCount,detail:"Directorio comercial",href:"contactos"},
     {label:"Oportunidades",value:opps.length,detail:money(opps.reduce((sum,o)=>sum+Number(o.valor_estimado||0),0))+" estimados",href:"oportunidades"},
     {label:"Tareas pendientes",value:tasks.filter(t=>!t.completada_at).length,detail:"Seguimientos por realizar",href:"trabajo"},
     {label:"Tareas vencidas",value:tasks.filter(t=>!t.completada_at&&new Date(t.vence_at).getTime()<Date.now()).length,detail:"Requieren atención",href:"trabajo"}
@@ -155,7 +156,7 @@ function NegocioCRMContent(){
    </div>
   </div>}
   {editing&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10"><div role="dialog" aria-modal="true" aria-label="Editar oportunidad" className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Oportunidad comercial</h2><div className="flex gap-2">{editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button></div></div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} required value={editTitle} onChange={e=>setEditTitle(e.target.value)}/></label><label className="block text-sm font-semibold">Contacto<select className={input+" mt-1"} required value={editContact} onChange={e=>setEditContact(e.target.value)}>{contacts.map(contact=><option key={contact.id} value={contact.id}>{contactName(contact.id)}</option>)}</select></label><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Etapa<select className={input+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>{stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></label></form><OpportunityCommercialOverview contact={contacts.find(c=>c.id===editing.contacto_id)||null} tasks={tasks.filter(t=>t.oportunidad_id===editing.id)} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
-  {section==="contactos"&&<BusinessContacts businessId={negocio!.id} contacts={contacts} opportunities={opps} tasks={tasks} onSaved={load}/>}
+  {section==="contactos"&&<BusinessContacts businessId={negocio!.id} opportunities={opps} tasks={tasks} onSaved={load}/>}
   {section==="trabajo"&&<BusinessTaskCenter tasks={tasks} opportunities={opps} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
  </CRMWorkspace>;
 }
