@@ -30,6 +30,7 @@ function NegocioCRMContent(){
  const section:CRMSection=requested==="contactos"||requested==="oportunidades"||requested==="trabajo"?requested:"resumen";
  const [allowed,setAllowed]=useState(false),[checking,setChecking]=useState(true),[loading,setLoading]=useState(false);
  const [boardPages,setBoardPages]=useState<Record<string,number>>({}),[boardCounts,setBoardCounts]=useState<Record<string,number>>({}),[boardRows,setBoardRows]=useState<Opportunity[]>([]);
+ const [agendaRevision,setAgendaRevision]=useState(0),[pendingAlerts,setPendingAlerts]=useState(0);
  const [contactCount,setContactCount]=useState(0);
  const [contacts,setContacts]=useState<Contact[]>([]),[opps,setOpps]=useState<Opportunity[]>([]),[tasks,setTasks]=useState<Task[]>([]);
  const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState(false);
@@ -67,7 +68,7 @@ function NegocioCRMContent(){
   const batches=await Promise.all(Array.from({length:Math.ceil(ids.length/100)},(_,i)=>supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("business_id",negocio.id).eq("ambito","negocio").is("archivado_at",null).in("id",ids.slice(i*100,(i+1)*100))));
   const failed=batches.find(r=>r.error);
   if(failed){setError("No fue posible cargar los contactos vinculados.");return;}
-  setBoardRows(nextRows);setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));setOpps(o.data||[]);setTasks(t.data||[]);
+  setAgendaRevision(v=>v+1);setBoardRows(nextRows);setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));setOpps(o.data||[]);setTasks(t.data||[]);
   }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
  },[negocio?.id,section,boardPages]);
  useEffect(()=>{
@@ -133,14 +134,11 @@ function NegocioCRMContent(){
   if(r.error)setError("No se pudo actualizar la tarea: "+r.error.message);else if(!r.data?.length)setError("No se actualizó la tarea. Verifica tus permisos o si todavía existe.");else await load();
   }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
+ useEffect(()=>{if(!allowed||!negocio?.id){setPendingAlerts(0);return;}let cancelled=false;async function refreshAlerts(){try{const r=await supabase.rpc("crm_agenda_negocio",{p_business_id:negocio!.id,p_filter:"pendientes",p_query:"",p_page:1});if(!cancelled&&!r.error)setPendingAlerts(Number(r.data.counts.vencidas)+Number(r.data.counts.proximas));}catch{}}void refreshAlerts();const timer=setInterval(refreshAlerts,60000);return()=>{cancelled=true;clearInterval(timer);};},[allowed,negocio?.id,agendaRevision]);
  if(cargando||checking)return <main className="mx-auto max-w-6xl p-8">Validando acceso al CRM…</main>;
  if(!allowed)return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-bold">CRM no disponible</h1><p className="mt-3 text-slate-600">Tu cuenta no tiene acceso al CRM de este negocio. Consulta al administrador.</p>{error&&<p role="alert" className="mt-3 text-red-700">{error}</p>}</main>;
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido,c.empresa].filter(Boolean).join(" · "):"Contacto no disponible";};
  const opportunityName=(id:string)=>opps.find(o=>o.id===id)?.titulo||"Oportunidad no disponible";
- const now=Date.now();
- const nextWeek=now+7*24*60*60*1000;
- const opportunityIds=new Set(opps.map(o=>o.id));
- const pendingAlerts=tasks.filter(t=>!t.completada_at&&opportunityIds.has(t.oportunidad_id)&&new Date(t.vence_at).getTime()<=nextWeek).length;
  return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"} pendingAlerts={pendingAlerts}>
   {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
@@ -173,7 +171,7 @@ function NegocioCRMContent(){
   </div>}
   {editing&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10"><div role="dialog" aria-modal="true" aria-label="Editar oportunidad" className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Oportunidad comercial</h2><div className="flex gap-2">{editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button></div></div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} required value={editTitle} onChange={e=>setEditTitle(e.target.value)}/></label><ContactPicker key={editing.id} businessId={negocio!.id} value={editContact} onChange={setEditContact} disabled={saving}/><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Etapa<select className={input+" mt-1"} value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>{stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></label></form><OpportunityCommercialOverview contact={contacts.find(c=>c.id===editing.contacto_id)||null} tasks={tasks.filter(t=>t.oportunidad_id===editing.id)} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
   {section==="contactos"&&<BusinessContacts businessId={negocio!.id} opportunities={opps} tasks={tasks} onSaved={load}/>}
-  {section==="trabajo"&&<BusinessTaskCenter tasks={tasks} opportunities={opps} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
+  {section==="trabajo"&&<BusinessTaskCenter businessId={negocio!.id} revision={agendaRevision} opportunities={opps} initialFilter={params.get("filtro")} saving={saving} taskTitle={taskTitle} setTaskTitle={setTaskTitle} taskDue={taskDue} setTaskDue={setTaskDue} taskOpp={taskOpp} setTaskOpp={setTaskOpp} onCreate={addTask} onToggle={t=>void toggleTask(t)}/> }
  </CRMWorkspace>;
 }
 export default function NegocioCRM(){return <Suspense fallback={<main className="p-8">Cargando CRM…</main>}><NegocioCRMContent/></Suspense>;}
