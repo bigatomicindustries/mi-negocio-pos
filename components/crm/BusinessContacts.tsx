@@ -35,9 +35,9 @@ export default function BusinessContacts({businessId,contacts,opportunities,task
   if(form.correo.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())){setError("Revisa el correo.");return;}
   const digits=form.telefono.replace(/\D/g,"");if(form.telefono.trim()&&(digits.length<7||digits.length>15)){setError("El teléfono debe tener entre 7 y 15 dígitos.");return;}
   setSaving(true);setError("");setNotice("");
-  const {error:err}=await supabase.rpc("crm_guardar_contacto_negocio",{p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_correo:form.correo,p_telefono:form.telefono,p_expected_updated_at:selected?.updated_at||null});
+  try{const {error:err}=await supabase.rpc("crm_guardar_contacto_negocio",{p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_correo:form.correo,p_telefono:form.telefono,p_expected_updated_at:selected?.updated_at||null});
   if(err){setError(err.code==="23505"?"El correo o teléfono ya está registrado en otro contacto de este negocio. No se guardaron cambios.":err.message);setSaving(false);return;}
-  setOpen(false);setEditMode(false);setNotice(selected?"Contacto actualizado.":"Contacto creado.");await onSaved();setSaving(false);
+  setOpen(false);setEditMode(false);setNotice(selected?"Contacto actualizado.":"Contacto creado.");await onSaved();}catch{setError("No se pudo confirmar el guardado. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  return <section className="space-y-5">
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
