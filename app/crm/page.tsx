@@ -27,15 +27,23 @@ function NegocioCRMContent(){
  const [title,setTitle]=useState(""),[contact,setContact]=useState(""),[amount,setAmount]=useState("0");
  const [taskTitle,setTaskTitle]=useState(""),[taskDue,setTaskDue]=useState(""),[taskOpp,setTaskOpp]=useState("");
  const [editing,setEditing]=useState<Opportunity|null>(null),[editTitle,setEditTitle]=useState(""),[editContact,setEditContact]=useState(""),[editAmount,setEditAmount]=useState("0"),[editStage,setEditStage]=useState<CRMStage>("nuevo"),[editOriginal,setEditOriginal]=useState(""),[editError,setEditError]=useState("");
+ const verifyAccess=useCallback(async()=>{
+  if(!negocio?.id||!user?.id)return false;
+  const r=await supabase.from("crm_acceso_negocios").select("habilitado").eq("business_id",negocio.id).eq("habilitado",true).maybeSingle();
+  if(r.error)throw new Error("No se pudo verificar el acceso. Revisa tu conexión e inténtalo nuevamente.");
+  if(!r.data?.habilitado){setAllowed(false);setError("Tu acceso al CRM ya no está habilitado. Consulta al administrador.");return false;}
+  return true;
+ },[negocio?.id,user?.id]);
  const editSnapshot=(t:string,c:string,a:string,s:CRMStage)=>JSON.stringify([t.trim(),c,Number(a),s]);
  const editDirty=!!editing&&editSnapshot(editTitle,editContact,editAmount,editStage)!==editOriginal;
  function openOpportunity(id:string){const row=opps.find(o=>o.id===id);if(!row)return;setEditing(row);setEditTitle(row.titulo);setEditContact(row.contacto_id);setEditAmount(String(row.valor_estimado));setEditStage(row.etapa as CRMStage);setEditOriginal(editSnapshot(row.titulo,row.contacto_id,String(row.valor_estimado),row.etapa as CRMStage));setEditError("");}
  function closeOpportunity(){if(saving)return;if(editDirty&&!window.confirm("¿Descartar cambios sin guardar?"))return;setEditing(null);setEditError("");}
- async function saveOpportunity(e:React.FormEvent){e.preventDefault();if(!editing||!editDirty||saving||!allowed||!negocio)return;const value=Number(editAmount);if(!editTitle.trim()||editTitle.trim().length>240||!contacts.some(c=>c.id===editContact)||!Number.isFinite(value)||value<0){setEditError("Revisa título, contacto y valor estimado.");return;}setSaving(true);setEditError("");const r=await supabase.from("crm_negocio_oportunidades").update({titulo:editTitle.trim(),contacto_id:editContact,valor_estimado:value,etapa:editStage,updated_at:new Date().toISOString()}).eq("id",editing.id).eq("business_id",negocio.id).select("id");if(r.error)setEditError("No se pudo guardar: "+r.error.message);else if(!r.data?.length)setEditError("No se actualizó el registro. Revisa tus permisos.");else{setEditing(null);setNotice("Oportunidad actualizada.");await load();}setSaving(false);}
+ async function saveOpportunity(e:React.FormEvent){e.preventDefault();if(!editing||!editDirty||saving||!allowed||!negocio)return;const value=Number(editAmount);if(!editTitle.trim()||editTitle.trim().length>240||!contacts.some(c=>c.id===editContact)||!Number.isFinite(value)||value<0){setEditError("Revisa título, contacto y valor estimado.");return;}setSaving(true);setEditError("");try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_oportunidades").update({titulo:editTitle.trim(),contacto_id:editContact,valor_estimado:value,etapa:editStage,updated_at:new Date().toISOString()}).eq("id",editing.id).eq("business_id",negocio.id).select("id");if(r.error)setEditError("No se pudo guardar: "+r.error.message);else if(!r.data?.length)setEditError("No se actualizó el registro. Revisa tus permisos.");else{setEditing(null);setNotice("Oportunidad actualizada.");await load();}}catch{setEditError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}}
 
  const load=useCallback(async()=>{
   if(!negocio?.id)return;
   setLoading(true);setError("");
+  try{
   const [c,o,t]=await Promise.all([
    supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null).order("created_at",{ascending:false}).limit(500),
    supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,created_at").eq("business_id",negocio.id).order("created_at",{ascending:false}).limit(500),
@@ -43,7 +51,7 @@ function NegocioCRMContent(){
   ]);
   if(c.error||o.error||t.error){setError("No fue posible cargar el CRM: "+(c.error||o.error||t.error)?.message);}
   else{setContacts(c.data||[]);setOpps(o.data||[]);setTasks(t.data||[]);}
-  setLoading(false);
+  }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
  },[negocio?.id]);
  useEffect(()=>{
   let cancelled=false;
@@ -51,10 +59,12 @@ function NegocioCRMContent(){
    if(cargando)return;
    setChecking(true);setAllowed(false);
    if(!user||!negocio||!perfil||!["admin","manager"].includes(perfil.role)){setChecking(false);return;}
+   try{
    const r=await supabase.from("crm_acceso_negocios").select("habilitado").eq("business_id",negocio.id).eq("habilitado",true).maybeSingle();
    if(cancelled)return;
    if(r.error){setError("No se pudo validar el acceso al CRM.");setChecking(false);return;}
    setAllowed(r.data?.habilitado===true);setChecking(false);
+   }catch{if(!cancelled){setError("No se pudo validar el acceso. Revisa tu conexión y recarga la página.");setChecking(false);}}
   }
   void check();return()=>{cancelled=true;};
  },[cargando,user?.id,negocio?.id,perfil?.role]);
@@ -64,26 +74,26 @@ function NegocioCRMContent(){
   const v=Number(amount);
   if(!title.trim()||title.trim().length>240||!contacts.some(c=>c.id===contact)||!Number.isFinite(v)||v<0){setError("Revisa el título, contacto y valor.");return;}
   setSaving(true);setError("");setNotice("");
-  const r=await supabase.from("crm_negocio_oportunidades").insert({business_id:negocio.id,contacto_id:contact,titulo:title.trim(),valor_estimado:v,created_by:user.id}).select("id");
+  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_oportunidades").insert({business_id:negocio.id,contacto_id:contact,titulo:title.trim(),valor_estimado:v,created_by:user.id}).select("id");
   if(r.error)setError("No se pudo crear la oportunidad: "+r.error.message);
   else if(!r.data?.length)setError("No se confirmó la creación. Revisa tus permisos.");
   else{setTitle("");setContact("");setAmount("0");setNotice("Oportunidad creada.");await load();}
-  setSaving(false);
+  }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function changeStage(id:string,etapa:CRMStage){
   if(!allowed||saving||!stages.includes(etapa))return;setSaving(true);setError("");
-  const r=await supabase.from("crm_negocio_oportunidades").update({etapa,updated_at:new Date().toISOString()}).eq("id",id).eq("business_id",negocio!.id).select("id");
+  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_oportunidades").update({etapa,updated_at:new Date().toISOString()}).eq("id",id).eq("business_id",negocio!.id).select("id");
   if(r.error)setError("No se pudo actualizar la etapa: "+r.error.message);else if(!r.data?.length)setError("No se actualizó la etapa. Verifica tus permisos o si la oportunidad existe.");else await load();
-  setSaving(false);
+  }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function addTask(e:React.FormEvent){
   e.preventDefault();if(!allowed||saving||!user||!opps.some(o=>o.id===taskOpp))return;
   const d=new Date(taskDue);if(!taskTitle.trim()||taskTitle.trim().length>240||!taskDue||Number.isNaN(d.getTime())){setError("Indica tarea y fecha válidas.");return;}
   setSaving(true);setError("");setNotice("");
-  const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id}).select("id");
+  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id}).select("id");
   if(r.error)setError("No se pudo crear la tarea: "+r.error.message);
   else if(!r.data?.length)setError("No se confirmó la creación de la tarea. Revisa tus permisos.");else{setTaskTitle("");setTaskDue("");setTaskOpp("");setNotice("Tarea programada.");await load();}
-  setSaving(false);
+  }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function createOpportunityTask(opportunityId:string,taskName:string,dueLocal:string):Promise<string|null>{
   if(!allowed||saving||!user||!negocio||!opps.some(o=>o.id===opportunityId))return "No tienes permiso para crear este seguimiento.";
@@ -91,6 +101,7 @@ function NegocioCRMContent(){
   if(!taskName.trim()||taskName.trim().length>240||!dueLocal||Number.isNaN(due.getTime()))return "Indica una tarea y una fecha válidas.";
   setSaving(true);
   try{
+   if(!await verifyAccess())return "Tu acceso al CRM ya no está habilitado.";
    const result=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:opportunityId,titulo:taskName.trim(),vence_at:due.toISOString(),created_by:user.id}).select("id");
    if(result.error)return "No se pudo crear el seguimiento: "+result.error.message;
    if(!result.data?.length)return "No se confirmó la creación del seguimiento. Revisa tus permisos.";
@@ -101,9 +112,9 @@ function NegocioCRMContent(){
  }
  async function toggleTask(t:Task){
   if(!allowed||saving)return;setSaving(true);setError("");
-  const r=await supabase.from("crm_negocio_tareas").update({completada_at:t.completada_at?null:new Date().toISOString()}).eq("id",t.id).select("id");
+  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_tareas").update({completada_at:t.completada_at?null:new Date().toISOString()}).eq("id",t.id).select("id");
   if(r.error)setError("No se pudo actualizar la tarea: "+r.error.message);else if(!r.data?.length)setError("No se actualizó la tarea. Verifica tus permisos o si todavía existe.");else await load();
-  setSaving(false);
+  }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  if(cargando||checking)return <main className="mx-auto max-w-6xl p-8">Validando acceso al CRM…</main>;
  if(!allowed)return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-bold">CRM no disponible</h1><p className="mt-3 text-slate-600">Tu cuenta no tiene acceso al CRM de este negocio. Consulta al administrador.</p>{error&&<p role="alert" className="mt-3 text-red-700">{error}</p>}</main>;
