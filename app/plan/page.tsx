@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { PRICING, type BillingInterval, type CommercialPlan } from "@/lib/pricing-v1";
 
 type Suscripcion = {
   plan_name: string;
@@ -34,6 +35,7 @@ const [suscripcion, setSuscripcion] =
   useState<Suscripcion | null>(null);
 
 const [loading, setLoading] = useState(true);
+const [interval, setInterval] = useState<BillingInterval>("monthly");
 const [error, setError] = useState("");
 
 const [procesandoPlan, setProcesandoPlan] =
@@ -487,108 +489,30 @@ window.location.href = data.checkout_url;
     </p>
   </div>
 
-  <div className="grid gap-5 md:grid-cols-2">
-    {/* PLAN PRO */}
-    <div className="rounded-3xl border border-slate-200 bg-white p-7">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Pro
-        </p>
-
-        <div className="mt-3 flex items-end gap-1">
-          <span className="text-4xl font-bold text-slate-900">
-            $299
-          </span>
-
-          <span className="mb-1 text-slate-500">
-            MXN / mes
-          </span>
+  <div className="mb-5 flex gap-2">
+    {(["monthly", "annual"] as const).map(value => (
+      <button key={value} type="button" aria-pressed={interval === value}
+        onClick={() => setInterval(value)}
+        className={`rounded-xl border px-4 py-2 ${interval === value ? "bg-green-700 text-white" : "bg-white text-slate-700"}`}>
+        {value === "monthly" ? "Mensual" : "Anual"}
+      </button>
+    ))}
+  </div>
+  <p className="mb-4 text-sm text-slate-500">Nuevos precios con IVA incluido. Contratación de estas tarifas pendiente de habilitación.</p>
+  <div className="grid gap-5 md:grid-cols-3">
+    {(Object.keys(PRICING) as CommercialPlan[]).map(key => {
+      const offer = PRICING[key];
+      return (
+        <div key={key} className="rounded-3xl border border-slate-200 bg-white p-7">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{offer.name}</p>
+          <div className="mt-3 text-4xl font-bold text-slate-900">
+            {(offer[interval] / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">MXN / {interval === "monthly" ? "mes" : "año"} · IVA incluido</p>
+          <button type="button" disabled className="mt-7 w-full rounded-xl bg-slate-200 px-5 py-3 text-slate-600">Próximamente</button>
         </div>
-      </div>
-
-      <div className="mt-6 space-y-3 text-sm text-slate-600">
-        <p>✓ Hasta 10 usuarios</p>
-        <p>✓ Hasta 5,000 productos</p>
-        <p>✓ Ventas e inventario</p>
-        <p>✓ Historial y control de caja</p>
-      </div>
-
-<button
-  type="button"
-  onClick={() => void contratarPlan("pro")}
-  disabled={
-    procesandoPlan !== null ||
-    (
-      suscripcion?.plan_slug === "pro" &&
-      suscripcion?.status !== "cancelled"
-    )
-  }
-  className="mt-7 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
->
-  {procesandoPlan === "pro"
-    ? "Abriendo Mercado Pago..."
-    : suscripcion?.plan_slug === "pro" &&
-      suscripcion?.status === "cancelled"
-    ? "Volver a contratar Pro"
-    : suscripcion?.plan_slug === "pro"
-    ? "Plan actual"
-    : "Elegir Pro"}
-</button>
-    </div>
-
-    {/* PLAN BUSINESS */}
-    <div className="rounded-3xl border border-slate-900 bg-white p-7 shadow-sm">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Business
-          </p>
-
-          <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-            Mayor capacidad
-          </span>
-        </div>
-
-        <div className="mt-3 flex items-end gap-1">
-          <span className="text-4xl font-bold text-slate-900">
-            $699
-          </span>
-
-          <span className="mb-1 text-slate-500">
-            MXN / mes
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3 text-sm text-slate-600">
-        <p>✓ Hasta 50 usuarios</p>
-        <p>✓ Hasta 50,000 productos</p>
-        <p>✓ Ventas e inventario</p>
-        <p>✓ Historial y control de caja</p>
-      </div>
-
-<button
-  type="button"
-  onClick={() => void contratarPlan("business")}
-  disabled={
-    procesandoPlan !== null ||
-    (
-      suscripcion?.plan_slug === "business" &&
-      suscripcion?.status !== "cancelled"
-    )
-  }
-  className="mt-7 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
->
-  {procesandoPlan === "business"
-    ? "Abriendo Mercado Pago..."
-    : suscripcion?.plan_slug === "business" &&
-      suscripcion?.status === "cancelled"
-    ? "Volver a contratar Business"
-    : suscripcion?.plan_slug === "business"
-    ? "Plan actual"
-    : "Elegir Business"}
-</button>
-    </div>
+      );
+    })}
   </div>
 </div>
 
