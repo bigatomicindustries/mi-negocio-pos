@@ -30,6 +30,9 @@ const {
   const esRutaPlan =
     pathname === "/plan";
 
+  // El CRM tiene su propia autorización por negocio y RLS.
+  const esRutaCRM = pathname === "/crm" || pathname.startsWith("/crm/");
+
   // El Platform Admin puede administrar la
   // plataforma aunque su tenant esté suspendido.
   if (
@@ -71,7 +74,8 @@ const mostrarBloqueoSuscripcion =
   !cargando &&
   !cerrandoSesion &&
   !puedeOperar &&
-  !esRutaPlan;
+  !esRutaPlan &&
+  !esRutaCRM;
 
 return (
   <>

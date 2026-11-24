@@ -138,24 +138,25 @@ console.error(
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-12">
       <div className="mx-auto max-w-6xl">
-        {esPlatformAdmin && <div className="mb-6 flex justify-end">
-          <Link href="/superadmin/prospectos" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800">Prospectos · CRM →</Link>
-        </div>}
-
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-green-600">
-            Administración SaaS
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            Negocios
-          </h1>
-
-          <p className="mt-2 text-slate-500">
-            Administra los negocios registrados en la
-            plataforma.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-green-600">
+              Administración SaaS
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900">
+              Negocios
+            </h1>
+          </div>
+          {esPlatformAdmin && (
+            <nav aria-label="Accesos comerciales" className="flex flex-wrap items-center gap-3">
+              <Link href="/superadmin/tablero" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-800">CRM →</Link>
+              <Link href="/superadmin/contactos" className="rounded-xl border border-green-700 bg-white px-5 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50">Contactos →</Link>
+            </nav>
+          )}
         </div>
+        <p className="mt-2 text-slate-500">
+          Administra los negocios registrados en la plataforma.
+        </p>
 
         {cargando && (
           <div className="mt-10 rounded-2xl border bg-white p-6">
