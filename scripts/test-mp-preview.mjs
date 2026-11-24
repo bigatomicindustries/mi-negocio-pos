@@ -61,6 +61,8 @@ globalThis.fetch = async (input,init) => {
     console.log("MP_QA_PROVIDER",JSON.stringify({http:response.status,
       recurring:!!body.auto_recurring,contract:!!body.id,application_match:String(body.application_id)===config.app,
       collector_match:String(body.collector_id)===config.collector,version:Number.isInteger(body.version),
+      causes:(Array.isArray(body.cause)?body.cause:[]).map(item=>({
+        code:String(item.code??"").slice(0,24),description:/^[a-z ._-]{1,120}$/i.test(item.description??"")?item.description:null})),
       code:typeof body.error==="string" && /^[a-z_]+$/i.test(body.error)?body.error:null,
       detail:!response.ok && typeof body.message==="string" && /^[a-zA-Z0-9 .,:'_/-]{1,160}$/.test(body.message)?body.message:null}));
   }
@@ -71,6 +73,7 @@ const cases = [
   ["business","monthly",199],["business","annual",1999],["basic","monthly",49],
 ];
 for (const [plan,interval,total] of cases) {
+  if (process.argv.includes("--basic-monthly") && (plan!=="basic" || interval!=="monthly")) continue;
   const months = interval === "annual"?12:1;
   const price = unwrap(await admin.from("billing_prices").select("id").eq("version","v1").eq("tier",plan)
     .eq("interval_months",months).single(),"tarifa");
