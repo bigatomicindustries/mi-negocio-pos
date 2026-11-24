@@ -52,13 +52,17 @@ function NegocioCRMContent(){
   if(!negocio?.id)return;
   setLoading(true);setError("");
   try{
-  const [c,o,t]=await Promise.all([
-   supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)",{count:"exact"}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null).order("created_at",{ascending:false}).limit(500),
+  const [count,o,t]=await Promise.all([
+   supabase.from("crm_contactos").select("id",{count:"exact",head:true}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null),
    supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,created_at").eq("business_id",negocio.id).order("created_at",{ascending:false}).limit(500),
    supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,completada_at").order("vence_at",{ascending:true}).limit(500)
   ]);
-  if(c.error||o.error||t.error){setError("No fue posible cargar el CRM: "+(c.error||o.error||t.error)?.message);}
-  else{setContactCount(c.count||0);setContacts(c.data||[]);setOpps(o.data||[]);setTasks(t.data||[]);}
+  if(count.error||o.error||t.error){setError("No fue posible cargar el CRM: "+(count.error||o.error||t.error)?.message);return;}
+  const ids=[...new Set((o.data||[]).map(row=>row.contacto_id))];
+  const batches=await Promise.all(Array.from({length:Math.ceil(ids.length/100)},(_,i)=>supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("business_id",negocio.id).eq("ambito","negocio").is("archivado_at",null).in("id",ids.slice(i*100,(i+1)*100))));
+  const failed=batches.find(r=>r.error);
+  if(failed){setError("No fue posible cargar los contactos vinculados.");return;}
+  setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));setOpps(o.data||[]);setTasks(t.data||[]);
   }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
  },[negocio?.id]);
  useEffect(()=>{
