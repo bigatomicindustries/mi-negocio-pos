@@ -86,6 +86,19 @@ begin
     tier_count := tier_count+1;
   end loop;
   if tier_count<>6 then raise exception 'six modes required'; end if;
+  -- A new tenant can start a purchase before it has a subscription.
+  execute 'reset role';
+  delete from public.subscriptions where business_id=biz;
+  execute 'set local role service_role';
+  attempt := public.billing_begin(admin_id,biz,price.id);
+  cid := (attempt->>'id')::uuid; remote := 'qa-'||cid;
+  perform public.billing_reconcile(cid,remote,0,'pending',price.amount_cents,'MXN',price.interval_months,null);
+  if exists(select from public.subscriptions where business_id=biz) then raise exception 'premature activation'; end if;
+  perform public.billing_reconcile(cid,remote,1,'authorized',price.amount_cents,'MXN',price.interval_months,later);
+  perform public.billing_reconcile(cid,remote,1,'authorized',price.amount_cents,'MXN',price.interval_months,later);
+  if (select count(*) from public.subscriptions where business_id=biz and plan_id=price.plan_id
+    and status='active' and mercadopago_subscription_id=remote and current_period_ends_at=later) <> 1 then
+    raise exception 'first subscription activation'; end if;
 end $test$;
 select 'PASS: six offers, permissions, grandfathering, replay, invoice and lifecycle' as result;
 rollback;
