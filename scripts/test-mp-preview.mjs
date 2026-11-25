@@ -17,11 +17,21 @@ registerHooks({ resolve(name, context, next) {
 } });
 
 const returnIndex = process.argv.indexOf("--verify-return");
-const pendingCheckout = process.argv.includes("--prepare-paid-checkout");
+const cases = [
+  ["basic","annual",499],["pro","monthly",99],["pro","annual",999],
+  ["business","monthly",199],["business","annual",1999],["basic","monthly",49],
+];
+const offerIndex = process.argv.indexOf("--paid-offer");
+const offer = process.argv[offerIndex + 1];
+const isolatedOffer = offerIndex !== -1;
+if (isolatedOffer && !cases.some(([plan, interval]) => offer === plan + "-" + interval)) {
+  throw new Error("Modalidad de prueba desconocida");
+}
+const pendingCheckout = isolatedOffer || process.argv.includes("--prepare-paid-checkout");
 const cancelTest = pendingCheckout || process.argv.includes("--observe-cancellation");
-const loginEmail = cancelTest ? "qa-pricing-cancel@example.invalid" : email;
+const loginEmail = isolatedOffer ? "qa-pricing-" + offer + "@example.invalid" : cancelTest ? "qa-pricing-cancel@example.invalid" : email;
 const webhookTest = process.argv.includes("--webhook-checkout") || returnIndex !== -1;
-const slug = cancelTest ? "qa-pricing-v1-cancel" : webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
+const slug = isolatedOffer ? "qa-pricing-v1-" + offer : cancelTest ? "qa-pricing-v1-cancel" : webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
 const { billingConfig, mpRead, mpRequest, readAgreement } = await import("../lib/billing-server.ts");
 const { checkoutLink, cents } = await import("../lib/billing-provider.ts");
 const config = billingConfig();
@@ -117,12 +127,9 @@ globalThis.fetch = async (input,init) => {
   }
   return response;
 };
-const cases = [
-  ["basic","annual",499],["pro","monthly",99],["pro","annual",999],
-  ["business","monthly",199],["business","annual",1999],["basic","monthly",49],
-];
 for (const [plan,interval,total] of cases) {
-  if ((cancelTest || webhookTest || process.argv.includes("--basic-monthly")) && (plan!=="basic" || interval!=="monthly")) continue;
+  if (isolatedOffer && offer !== plan + "-" + interval) continue;
+  if (!isolatedOffer && (cancelTest || webhookTest || process.argv.includes("--basic-monthly")) && (plan!=="basic" || interval!=="monthly")) continue;
   const months = interval === "annual"?12:1;
   const price = unwrap(await admin.from("billing_prices").select("id").eq("version","v1").eq("tier",plan)
     .eq("interval_months",months).single(),"tarifa");
@@ -141,7 +148,7 @@ for (const [plan,interval,total] of cases) {
       remote.auto_recurring?.frequency!==months || remote.auto_recurring.frequency_type!=="months" ||
       checkoutLink(remote)!==checkout.checkout_url) throw new Error("Contrato de prueba inesperado");
   if (pendingCheckout) {
-    console.log("QA_WEBHOOK_CHECKOUT",checkout.checkout_url);
+    console.log("QA_WEBHOOK_CHECKOUT",plan,interval,checkout.checkout_url);
     break;
   }
   if (cancelTest) {
