@@ -17,8 +17,10 @@ registerHooks({ resolve(name, context, next) {
 } });
 
 const returnIndex = process.argv.indexOf("--verify-return");
+const cancelTest = process.argv.includes("--observe-cancellation");
+const loginEmail = cancelTest ? "qa-pricing-cancel@example.invalid" : email;
 const webhookTest = process.argv.includes("--webhook-checkout") || returnIndex !== -1;
-const slug = webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
+const slug = cancelTest ? "qa-pricing-v1-cancel" : webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
 const { billingConfig, mpRead, mpRequest, readAgreement } = await import("../lib/billing-server.ts");
 const { checkoutLink, cents } = await import("../lib/billing-provider.ts");
 const config = billingConfig();
@@ -38,7 +40,7 @@ const unwrap = (result,step) => {
 const store = unwrap(await admin.from("businesses").select("id").eq("slug",slug).eq("active",true).single(),"negocio de pruebas");
 
 const made = await admin.auth.admin.createUser({
-  email, password:randomUUID()+randomUUID(), email_confirm:true, app_metadata:{pricing_qa:store.id},
+  email:loginEmail, password:randomUUID()+randomUUID(), email_confirm:true, app_metadata:{pricing_qa:store.id},
 });
 if (made.error && !["email_exists","user_already_exists"].includes(made.error.code)) unwrap(made,"alta de comprador DEV");
 if (made.error) {
@@ -46,11 +48,11 @@ if (made.error) {
   let owned = false;
   for (const member of members) {
     const identity = unwrap(await admin.auth.admin.getUserById(member.id),"identidad de prueba").user;
-    if (identity.email?.toLowerCase() === email && identity.app_metadata?.pricing_qa === store.id) owned = true;
+    if (identity.email?.toLowerCase() === loginEmail && identity.app_metadata?.pricing_qa === store.id) owned = true;
   }
   if (!owned) throw new Error("La cuenta existente no es un comprador de este negocio de pruebas.");
 }
-const link = unwrap(await admin.auth.admin.generateLink({type:"magiclink",email}),"sesión efímera de pruebas");
+const link = unwrap(await admin.auth.admin.generateLink({type:"magiclink",email:loginEmail}),"sesión efímera de pruebas");
 if (link.user.app_metadata?.pricing_qa !== store.id) throw new Error("Este usuario no pertenece al negocio de pruebas.");
 const userId = link.user.id;
 const profile = unwrap(await admin.from("profiles").select("business_id,role,active").eq("id",userId).maybeSingle(),"perfil");
@@ -95,6 +97,12 @@ if (returnIndex !== -1) {
 // Record provider status codes for troubleshooting. Exclude account data and credentials.
 const transport = globalThis.fetch;
 globalThis.fetch = async (input,init) => {
+  // This isolated POS admin has its own login. Only the test transport uses the verified sandbox payer.
+  if (cancelTest && String(input) === "https://api.mercadopago.com/preapproval" && init?.method === "POST") {
+    const payload = JSON.parse(init.body);
+    if (payload.payer_email !== loginEmail) throw Error("Administrador QA inesperado");
+    init = {...init,body:JSON.stringify({...payload,payer_email:email})};
+  }
   const response = await transport(input,init);
   if (String(input) === "https://api.mercadopago.com/preapproval" && init?.method === "POST") {
     const body = await response.clone().json().catch(()=>({}));
@@ -113,7 +121,7 @@ const cases = [
   ["business","monthly",199],["business","annual",1999],["basic","monthly",49],
 ];
 for (const [plan,interval,total] of cases) {
-  if ((webhookTest || process.argv.includes("--basic-monthly")) && (plan!=="basic" || interval!=="monthly")) continue;
+  if ((cancelTest || webhookTest || process.argv.includes("--basic-monthly")) && (plan!=="basic" || interval!=="monthly")) continue;
   const months = interval === "annual"?12:1;
   const price = unwrap(await admin.from("billing_prices").select("id").eq("version","v1").eq("tier",plan)
     .eq("interval_months",months).single(),"tarifa");
@@ -131,6 +139,21 @@ for (const [plan,interval,total] of cases) {
       remote.auto_recurring?.currency_id!=="MXN" || cents(remote.auto_recurring?.transaction_amount)!==total*100 ||
       remote.auto_recurring?.frequency!==months || remote.auto_recurring.frequency_type!=="months" ||
       checkoutLink(remote)!==checkout.checkout_url) throw new Error("Contrato de prueba inesperado");
+  if (cancelTest) {
+    const cancelled = await mpRequest("/preapproval/" + encodeURIComponent(remote.id), {
+      method:"PUT", body:JSON.stringify({status:"cancelled"}),
+    });
+    if (!cancelled.ok || (await readAgreement(remote.id)).status !== "cancelled") throw Error("Cancelación no confirmada");
+    console.log("QA_CANCEL_REMOTE",remote.id);
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const row = unwrap(await admin.from("billing_contracts").select("status")
+        .eq("id",checkout.checkout_id).eq("provider_id",remote.id).single(),"lectura de estado");
+      if (row.status === "cancelled") { console.log("QA_CANCEL_LOCAL cancelled"); break; }
+      if (attempt === 29) console.log("QA_CANCEL_LOCAL",row.status);
+      else await new Promise(resolve => setTimeout(resolve,2000));
+    }
+    break;
+  }
   if (webhookTest) {
     console.log("QA_WEBHOOK_CHECKOUT", checkout.checkout_url);
     break;
