@@ -14,7 +14,7 @@ Cada importe incluye IVA. El anual se cobra completo cada doce meses.
 
 El navegador elige plan e intervalo. El servidor autentica al administrador, comprueba el negocio activo y coteja el catálogo de Supabase con el precio mostrado. Los importes se almacenan como centavos enteros. El rol de la aplicación solo puede leer las tarifas. Para cambiar un precio se agrega una versión y se conserva la fila contratada.
 
-Cada alta crea una suscripción individual pendiente mediante `POST /preapproval`. La referencia externa identifica un contrato local. El retorno a `/plan` y el webhook consultan la API con credenciales del servidor y pasan por la misma transacción. Se comprueban vendedor, aplicación, referencia, moneda, importe y frecuencia. Se acepta la actualización más reciente según la versión de Mercado Pago. La autorización activa el plan. Las cuotas y su estado de pago se registran por separado con su identificador de factura. Una autorización por sí sola no acredita una cuota.
+Cada alta crea una suscripción individual pendiente mediante `POST /preapproval`. La referencia externa identifica un contrato local. El retorno a `/plan` y el webhook consultan la API con credenciales del servidor y pasan por la misma transacción. Se comprueban vendedor, aplicación, referencia, moneda, importe y frecuencia. Se acepta la actualización más reciente según la fecha de modificación de Mercado Pago. La autorización activa el plan. Las cuotas y su estado de pago se registran por separado con su identificador de factura. Una autorización por sí sola no acredita una cuota.
 
 La migración agrega tres planes operativos con identificadores distintos. Básico hereda los límites POS de Free en esta etapa (2 usuarios, 100 productos, 1 sucursal). Pro y Business toman los límites POS existentes (10/5,000/1 y 50/50,000/3). Los límites de CRM y la política de prueba/suspensión corresponden a etapas posteriores. Los registros de suscripción existentes conservan sus IDs, importes y condiciones. La contratación v1 acepta el paso voluntario desde Free o desde un contrato cancelado. Bloquea la sustitución de un contrato vigente, incluso si fue asignado manualmente.
 
@@ -43,6 +43,12 @@ npm audit --omit=dev
 ```
 
 En DEV, ejecutar todo `sql/dev/test_pricing_v1.sql` en la misma transacción. El build requiere la configuración Supabase del entorno. Las advertencias por Upstash en una compilación local sin sus variables corresponden a otros módulos.
+
+## Resultado con el correo confirmado del nuevo comprador
+
+Mercado Pago creó seis preautorizaciones. Se cotejaron la referencia, el vendedor, la aplicación, la moneda MXN, el importe y la frecuencia de cada una con los valores aprobados de la tabla. El proveedor omitió la versión numérica en su respuesta. La conciliación ahora usa la fecha de modificación del recurso remoto. Se recuperó el primer contrato por su referencia, sin duplicar el alta.
+
+El POS confirmó el estado pendiente de las seis modalidades. Se cancelaron cinco contratos de prueba y el POS confirmó cada cancelación. Quedó pendiente Básico mensual de $49 para autorización del comprador. Los dos intentos previos con correo inferido son históricos. Quedan por verificar el checkout autorizado, el retorno con sesión, la entrega del webhook por Mercado Pago y el registro de la cuota.
 
 ## Preview y prueba con Mercado Pago
 
