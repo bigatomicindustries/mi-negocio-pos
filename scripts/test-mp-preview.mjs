@@ -17,7 +17,8 @@ registerHooks({ resolve(name, context, next) {
 } });
 
 const returnIndex = process.argv.indexOf("--verify-return");
-const cancelTest = process.argv.includes("--observe-cancellation");
+const pendingCheckout = process.argv.includes("--prepare-paid-checkout");
+const cancelTest = pendingCheckout || process.argv.includes("--observe-cancellation");
 const loginEmail = cancelTest ? "qa-pricing-cancel@example.invalid" : email;
 const webhookTest = process.argv.includes("--webhook-checkout") || returnIndex !== -1;
 const slug = cancelTest ? "qa-pricing-v1-cancel" : webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
@@ -139,6 +140,10 @@ for (const [plan,interval,total] of cases) {
       remote.auto_recurring?.currency_id!=="MXN" || cents(remote.auto_recurring?.transaction_amount)!==total*100 ||
       remote.auto_recurring?.frequency!==months || remote.auto_recurring.frequency_type!=="months" ||
       checkoutLink(remote)!==checkout.checkout_url) throw new Error("Contrato de prueba inesperado");
+  if (pendingCheckout) {
+    console.log("QA_WEBHOOK_CHECKOUT",checkout.checkout_url);
+    break;
+  }
   if (cancelTest) {
     const cancelled = await mpRequest("/preapproval/" + encodeURIComponent(remote.id), {
       method:"PUT", body:JSON.stringify({status:"cancelled"}),
