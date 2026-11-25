@@ -16,7 +16,8 @@ registerHooks({ resolve(name, context, next) {
   return next(name, context);
 } });
 
-const webhookTest = process.argv.includes("--webhook-checkout");
+const returnIndex = process.argv.indexOf("--verify-return");
+const webhookTest = process.argv.includes("--webhook-checkout") || returnIndex !== -1;
 const slug = webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
 const { billingConfig, mpRead, mpRequest, readAgreement } = await import("../lib/billing-server.ts");
 const { checkoutLink, cents } = await import("../lib/billing-provider.ts");
@@ -62,6 +63,35 @@ const post = body => new Request(config.origin,{method:"POST",headers,body:JSON.
 const subscribe = await import("../app/api/mercadopago/subscribe/route.ts");
 const confirm = await import("../app/api/mercadopago/v1/confirm/route.ts");
 
+// Reuse the approved checkout. This mode never starts or cancels a subscription.
+if (returnIndex !== -1) {
+  const providerId = process.argv[returnIndex + 1];
+  if (!/^[a-f0-9]{32}$/.test(providerId ?? "")) throw Error("ID de prueba inválido");
+  const contract = unwrap(await admin.from("billing_contracts").select("id")
+    .eq("business_id",store.id).eq("requested_by",userId).eq("provider_id",providerId).single(),"contrato QA");
+  const remote = await readAgreement(providerId);
+  const expected = new URL("/plan?checkout_v1=" + contract.id, config.origin);
+  if (remote.status !== "authorized" || remote.back_url !== expected.href ||
+      String(remote.application_id) !== config.app || String(remote.collector_id) !== config.collector) {
+    throw Error("El retorno del proveedor no coincide con el checkout autorizado");
+  }
+  for (let pass = 1; pass <= 2; pass++) {
+    const response = await confirm.POST(post({checkout_id:expected.searchParams.get("checkout_v1")}));
+    const data = await response.json();
+    if (!response.ok || !data.success || data.status !== "authorized") throw Error("Confirmación QA HTTP " + response.status);
+    console.log("QA_RETURN", pass, response.status, data.status);
+  }
+  const { recordInvoice } = await import("../lib/billing-server.ts");
+  const invoices = await mpRead("/authorized_payments/search?preapproval_id=" + providerId);
+  if (invoices.results.length !== 1) throw Error("Se esperaba una sola cuota inicial");
+  const invoice = await mpRead("/authorized_payments/" + encodeURIComponent(invoices.results[0].id));
+  if (invoice.preapproval_id !== providerId || invoice.payment?.status !== "approved" ||
+      invoice.currency_id !== "MXN" || cents(invoice.transaction_amount) !== 4900) throw Error("Cuota QA inesperada");
+  await recordInvoice(invoice);
+  await recordInvoice(invoice);
+  console.log("QA_INVOICE_REPLAY", invoice.payment.status);
+  process.exitCode = 0;
+} else {
 // Record provider status codes for troubleshooting. Exclude account data and credentials.
 const transport = globalThis.fetch;
 globalThis.fetch = async (input,init) => {
@@ -118,4 +148,6 @@ for (const [plan,interval,total] of cases) {
   const done = await confirm.POST(post(args));
   if (!done.ok || (await done.json()).status!=="cancelled") throw new Error("Cancelación de prueba pendiente");
   console.log("MP_QA_OFFER",plan,interval,total,months,"cancelled");
+}
+
 }
