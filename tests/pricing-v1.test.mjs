@@ -66,7 +66,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (request.method === "POST" && url.pathname === "/preapproval") {
       lastPayload = body;
       const id = randomUUID().replaceAll("-","");
-      const remote = {...body,id,version:0,collector_id:100,application_id:200,
+      const remote = {...body,id,last_modified:"2026-11-24T00:00:00Z",collector_id:100,application_id:200,
         init_point:"https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id="+id};
       remotes.set(id,remote);
       return json(remote,201);
@@ -110,7 +110,7 @@ for (const [plan,prices] of Object.entries(expected)) {
       const args={checkout_id:r.checkout_id,preapproval_id:id};
       assert.equal((await (await confirm.POST(post(args))).json()).status,"pending");
       assert.equal((await confirm.POST(post(args,"other"))).status,404);
-      remote.status="authorized"; remote.version++;
+      remote.status="authorized"; remote.last_modified="2026-11-24T00:01:00Z";
       assert.equal((await webhook.POST(notify("subscription_preapproval",id))).status,200);
       assert.equal((await (await confirm.POST(post(args))).json()).status,"authorized");
       assert.equal((await webhook.POST(notify("subscription_authorized_payment","123"))).status,200);

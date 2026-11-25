@@ -3,7 +3,7 @@ import type { BillingInterval, CommercialPlan } from "./pricing-v1";
 
 export type Price = { id: string; tier: CommercialPlan; amount_cents: number; interval_months: number; currency: string; vat_included: boolean };
 export type RemoteAgreement = {
-  id: string; version: number; external_reference: string; collector_id: number; application_id: number;
+  id: string; last_modified: string; external_reference: string; collector_id: number; application_id: number;
   status: string; next_payment_date?: string; init_point?: string;
   auto_recurring?: { transaction_amount: number | string; currency_id: string; frequency: number; frequency_type: string };
 };
@@ -41,7 +41,7 @@ export function checkAgreement(remote: RemoteAgreement, id: string, collector: s
     throw new BillingError(409, "El contrato no corresponde a esta aplicación.");
   }
   const contract = remote.external_reference.slice(6);
-  if (!uuid.test(contract) || !Number.isSafeInteger(remote.version) || remote.version < 0 ||
+  if (!uuid.test(contract) ||
       remote.auto_recurring?.frequency_type !== "months" || ![1,12].includes(remote.auto_recurring.frequency)) {
     throw new BillingError(409, "La referencia o periodicidad del contrato es inválida.");
   }

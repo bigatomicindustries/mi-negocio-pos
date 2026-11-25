@@ -71,9 +71,12 @@ export async function reconcile(remote: RemoteAgreement, id: string, expected?: 
   const { collector, app } = billingConfig();
   const contract = checkAgreement(remote, id, collector, app);
   if (expected && contract !== expected) throw new BillingError(409, "La referencia de contratación no coincide.");
+  // Mercado Pago may omit version. Use the same provider clock for every state.
+  const modified = Date.parse(remote.last_modified);
+  if (!Number.isSafeInteger(modified) || modified < 0) throw new BillingError(409, "Fecha de actualización inválida.");
   const recurring = remote.auto_recurring!;
   const { data, error } = await supabaseAdmin.rpc("billing_reconcile", {
-    p_contract: contract, p_provider: id, p_version: remote.version, p_status: remote.status,
+    p_contract: contract, p_provider: id, p_version: modified, p_status: remote.status,
     p_cents: cents(recurring.transaction_amount), p_currency: recurring.currency_id,
     p_months: recurring.frequency, p_next: remote.next_payment_date || null,
   });
