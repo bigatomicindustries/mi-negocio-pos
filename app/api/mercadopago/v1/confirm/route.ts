@@ -1,5 +1,5 @@
 import { BillingError, uuid, providerId } from "@/lib/billing-provider";
-import { billingActor, billingConfig, billingFailure, readAgreement, reconcile } from "@/lib/billing-server";
+import { billingActor, billingConfig, billingFailure, confirmAgreement } from "@/lib/billing-server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     if (!id || typeof id !== "string" || !providerId.test(id) || (body.preapproval_id && body.preapproval_id !== id)) {
       throw new BillingError(409, "No se pudo comprobar la referencia de Mercado Pago.");
     }
-    const result = await reconcile(await readAgreement(id), id, data.id);
+    const result = await confirmAgreement(id, data.id);
     return Response.json({ success: true, status: result.status });
   } catch (e) { return billingFailure(e); }
 }

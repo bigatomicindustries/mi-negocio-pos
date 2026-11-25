@@ -1,5 +1,5 @@
 import { BillingError, verifyWebhook, type Invoice } from "@/lib/billing-provider";
-import { billingConfig, billingFailure, mpRead, readAgreement, reconcile, recordInvoice } from "@/lib/billing-server";
+import { billingConfig, billingFailure, mpRead, confirmAgreement, recordInvoice } from "@/lib/billing-server";
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || String(body.data?.id) !== id) throw new BillingError(400, "Notificación inválida.");
     if (body.type === "subscription_preapproval") {
-      await reconcile(await readAgreement(id), id);
+      await confirmAgreement(id);
     } else if (body.type === "subscription_authorized_payment") {
       const invoice = await mpRead<Invoice>("/authorized_payments/" + encodeURIComponent(id));
       if (String(invoice.id) !== id) throw new BillingError(409, "Cuota inválida.");

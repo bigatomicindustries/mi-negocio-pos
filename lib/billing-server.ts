@@ -87,12 +87,38 @@ export async function readAgreement(id: string) {
   if (typeof id !== "string" || !providerId.test(id)) throw new BillingError(400, "Referencia inválida.");
   return mpRead<RemoteAgreement>("/preapproval/" + encodeURIComponent(id));
 }
+// Recover the latest charge on authorization or buyer return, even when its own
+// notification was delayed. Only a canonical invoice can populate the ledger.
+export async function confirmAgreement(id: string, expected?: string) {
+  const remote = await readAgreement(id);
+  const result = await reconcile(remote, id, expected);
+  if (remote.status === "authorized" && result.status === "authorized") {
+    const search = await mpRead<{ results: { id: number; preapproval_id: string }[] }>(
+      "/authorized_payments/search?preapproval_id=" + encodeURIComponent(id) + "&limit=1"
+    );
+    const latest = search.results[0];
+    if (latest) {
+      if (latest.preapproval_id !== id) throw new BillingError(409, "Cuota ajena a la suscripción.");
+      const invoice = await mpRead<Invoice>("/authorized_payments/" + encodeURIComponent(latest.id));
+      if (String(invoice.id) !== String(latest.id) || invoice.preapproval_id !== id) {
+        throw new BillingError(409, "La cuota no corresponde a esta suscripción.");
+      }
+      await saveInvoice(result.contract, invoice);
+    }
+  }
+  return result;
+}
+
 export async function recordInvoice(invoice: Invoice) {
   const id = invoice.preapproval_id;
   const remote = await readAgreement(id);
   const { contract } = await reconcile(remote, id);
+  await saveInvoice(contract, invoice);
+}
+
+async function saveInvoice(contract: string, invoice: Invoice) {
   const saved = await supabaseAdmin.rpc("billing_record_invoice", {
-    p_contract: contract, p_provider: id, p_invoice: String(invoice.id),
+    p_contract: contract, p_provider: invoice.preapproval_id, p_invoice: String(invoice.id),
     p_cents: cents(invoice.transaction_amount), p_currency: invoice.currency_id,
     p_status: invoice.status, p_payment: invoice.payment?.id ? String(invoice.payment.id) : null,
     p_payment_status: invoice.payment?.status ?? null, p_updated: invoice.last_modified,

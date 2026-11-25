@@ -8,8 +8,8 @@ registerHooks({resolve(name, ctx, next) {
   return next(name,ctx);
 }});
 const {supabaseAdmin:db}=await import("../lib/supabaseAdmin.ts");
-const {readAgreement,reconcile,recordInvoice,mpRead}=await import("../lib/billing-server.ts");
-if (process.argv.includes("--inspect-offers")) {
+const {readAgreement,reconcile,recordInvoice,mpRead,confirmAgreement}=await import("../lib/billing-server.ts");
+if (process.argv.includes("--inspect-offers") || process.argv.includes("--confirm-offers")) {
   const slugs = ["basic-annual","pro-monthly","pro-annual","business-monthly","business-annual"]
     .map(offer => "qa-pricing-v1-" + offer);
   const {data, error} = await db.from("billing_contracts")
@@ -21,6 +21,10 @@ if (process.argv.includes("--inspect-offers")) {
     if (agreement.external_reference !== "mn-v1:" + contract.id ||
         String(agreement.application_id) !== process.env.MP_V1_APPLICATION_ID ||
         String(agreement.collector_id) !== process.env.MP_V1_COLLECTOR_ID) throw Error("Contrato de QA inesperado");
+    if (process.argv.includes("--confirm-offers")) {
+      const verified = await confirmAgreement(contract.provider_id, contract.id);
+      if (verified.status !== "authorized") throw Error("Estado inesperado tras confirmar");
+    }
     const result = await mpRead("/authorized_payments/search?preapproval_id=" + encodeURIComponent(contract.provider_id));
     console.log("QA_CUOTAS", contract.businesses.slug, result.results.length);
     for (const row of result.results) {

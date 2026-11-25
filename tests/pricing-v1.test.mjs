@@ -73,6 +73,9 @@ globalThis.fetch = async (input, init = {}) => {
     }
     if (url.pathname === "/preapproval/search") return json({results:[...remotes.values()]});
     if (url.pathname.startsWith("/preapproval/")) return json(remotes.get(url.pathname.split("/").at(-1)) ?? {},200);
+    if (url.pathname === "/authorized_payments/search" && url.searchParams.has("preapproval_id")) {
+      return json({results:[{id:123, preapproval_id:url.searchParams.get("preapproval_id")}]});
+    }
     if (url.pathname === "/authorized_payments/123") {
       const remote = [...remotes.values()].at(-1);
       return json({id:123,preapproval_id:remote.id,currency_id:"MXN",transaction_amount:remote.auto_recurring.transaction_amount,
@@ -111,7 +114,10 @@ for (const [plan,prices] of Object.entries(expected)) {
       assert.equal((await (await confirm.POST(post(args))).json()).status,"pending");
       assert.equal((await confirm.POST(post(args,"other"))).status,404);
       remote.status="authorized"; remote.last_modified="2026-11-24T00:01:00Z";
+      invoices.clear();
       assert.equal((await webhook.POST(notify("subscription_preapproval",id))).status,200);
+      assert.equal(invoices.get("123").p_payment_status,"approved");
+      assert.equal(invoices.get("123").p_contract,r.checkout_id);
       assert.equal((await (await confirm.POST(post(args))).json()).status,"authorized");
       assert.equal((await webhook.POST(notify("subscription_authorized_payment","123"))).status,200);
       assert.equal((await webhook.POST(notify("payment","321"))).status,200);
