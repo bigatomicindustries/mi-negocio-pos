@@ -43,6 +43,7 @@ function PlanContent() {
   const checkout = params.get("checkout_v1");
   const { perfil, negocio } = useAuth();
   const [suscripcion, setSuscripcion] = useState<Suscripcion | null>(null);
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [enabled, setEnabled] = useState(false);
@@ -53,6 +54,10 @@ function PlanContent() {
   useEffect(() => {
     if (!perfil?.id) return;
     if (perfil.role !== "admin") { router.replace("/"); return; }
+    setLoading(true);
+    setSubscriptionLoaded(false);
+    setSuscripcion(null);
+    setEnabled(false);
     let current = true;
     async function load() {
       try {
@@ -74,8 +79,11 @@ function PlanContent() {
           } catch (e) { if (current) setError(e instanceof Error ? e.message : "No se pudo confirmar la suscripción."); }
         }
         const { data, error: dbError } = await supabase.rpc("get_my_subscription");
-        if (dbError || !data?.[0]) throw new Error("No se pudo consultar la suscripción del negocio.");
-        if (current) setSuscripcion(data[0]);
+        if (dbError) throw new Error("No se pudo consultar la suscripción del negocio.");
+        if (current) {
+          setSuscripcion(data?.[0] ?? null);
+          setSubscriptionLoaded(true);
+        }
         const ready = await fetch("/api/mercadopago/subscribe", {cache:"no-store"});
         if (ready.ok) {
           const settings = await ready.json();
@@ -103,18 +111,6 @@ function PlanContent() {
     }
   }
 
-  function porcentaje(
-    actual: number,
-    maximo: number
-  ) {
-    if (maximo <= 0) return 0;
-
-    return Math.min(
-      100,
-      Math.round((actual / maximo) * 100)
-    );
-  }
-
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-12">
@@ -127,7 +123,7 @@ function PlanContent() {
     );
   }
 
-  if (!suscripcion) {
+  if (!suscripcion && error && !subscriptionLoaded) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-12">
         <div className="mx-auto max-w-5xl">
@@ -139,24 +135,6 @@ function PlanContent() {
       </main>
     );
   }
-
-  const porcentajeUsuarios = porcentaje(
-    Number(suscripcion.current_users),
-    Number(suscripcion.max_users)
-  );
-
-  const porcentajeProductos = porcentaje(
-    Number(suscripcion.current_products),
-    Number(suscripcion.max_products)
-  );
-
-  const usuariosAlLimite =
-    Number(suscripcion.current_users) >=
-    Number(suscripcion.max_users);
-
-  const productosAlLimite =
-    Number(suscripcion.current_products) >=
-    Number(suscripcion.max_products);
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-12">
@@ -181,6 +159,88 @@ function PlanContent() {
         {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
         {notice && <p role="status" className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">{notice}</p>}
 
+        {suscripcion ? <PlanActual suscripcion={suscripcion} /> : <p className="mt-8">Este negocio aún no tiene una suscripción.</p>}
+
+        {/* CAMBIAR DE PLAN */}
+
+<div className="mt-6">
+  <div className="mb-5">
+    <h2 className="text-xl font-bold text-slate-900">
+      {suscripcion ? "¿Necesitas más capacidad?" : "Planes disponibles"}
+    </h2>
+
+    <p className="mt-2 text-slate-500">
+      Elige el plan que mejor se adapte a tu negocio.
+    </p>
+  </div>
+
+  <div className="mb-5 flex gap-2">
+    {(["monthly", "annual"] as const).map(value => (
+      <button key={value} type="button" aria-pressed={interval === value}
+        onClick={() => setInterval(value)}
+        className={`rounded-xl border px-4 py-2 ${interval === value ? "bg-green-700 text-white" : "bg-white text-slate-700"}`}>
+        {value === "monthly" ? "Mensual" : "Anual"}
+      </button>
+    ))}
+  </div>
+  <p className="mb-4 text-sm text-slate-500">{enabled ? "La suscripción se renueva con la periodicidad que elijas." : "La contratación de estas tarifas estará disponible próximamente."}</p>
+  <div className="grid gap-5 md:grid-cols-3">
+    {(Object.keys(PRICING) as CommercialPlan[]).map(key => {
+      const offer = PRICING[key];
+      return (
+        <div key={key} className="rounded-3xl border border-slate-200 bg-white p-7">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{offer.name}</p>
+          <div className="mt-3 text-4xl font-bold text-slate-900">
+            {(offer[interval] / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">MXN / {interval === "monthly" ? "mes" : "año"} · IVA incluido</p>
+          <button type="button" disabled={!enabled || procesandoPlan !== null}
+            onClick={() => void contratarPlan(key)}
+            className="mt-7 w-full rounded-xl bg-green-700 px-5 py-3 text-white disabled:bg-slate-200 disabled:text-slate-600">
+            {procesandoPlan === key ? "Abriendo Mercado Pago…" : enabled ? "Contratar " + offer.name : "Próximamente"}
+          </button>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+      </div>
+    </main>
+  );
+}
+function PlanActual({ suscripcion }: { suscripcion: Suscripcion }) {
+  function porcentaje(
+    actual: number,
+    maximo: number
+  ) {
+    if (maximo <= 0) return 0;
+
+    return Math.min(
+      100,
+      Math.round((actual / maximo) * 100)
+    );
+  }
+
+  const porcentajeUsuarios = porcentaje(
+    Number(suscripcion.current_users),
+    Number(suscripcion.max_users)
+  );
+
+  const porcentajeProductos = porcentaje(
+    Number(suscripcion.current_products),
+    Number(suscripcion.max_products)
+  );
+
+  const usuariosAlLimite =
+    Number(suscripcion.current_users) >=
+    Number(suscripcion.max_users);
+
+  const productosAlLimite =
+    Number(suscripcion.current_products) >=
+    Number(suscripcion.max_products);
+
+  return <>
         {/* PLAN ACTUAL */}
 
         <div className="mt-10 rounded-3xl border bg-white p-8">
@@ -324,51 +384,5 @@ function PlanContent() {
           </div>
         </div>
 
-        {/* CAMBIAR DE PLAN */}
-
-<div className="mt-6">
-  <div className="mb-5">
-    <h2 className="text-xl font-bold text-slate-900">
-      ¿Necesitas más capacidad?
-    </h2>
-
-    <p className="mt-2 text-slate-500">
-      Elige el plan que mejor se adapte a tu negocio.
-    </p>
-  </div>
-
-  <div className="mb-5 flex gap-2">
-    {(["monthly", "annual"] as const).map(value => (
-      <button key={value} type="button" aria-pressed={interval === value}
-        onClick={() => setInterval(value)}
-        className={`rounded-xl border px-4 py-2 ${interval === value ? "bg-green-700 text-white" : "bg-white text-slate-700"}`}>
-        {value === "monthly" ? "Mensual" : "Anual"}
-      </button>
-    ))}
-  </div>
-  <p className="mb-4 text-sm text-slate-500">{enabled ? "La suscripción se renueva con la periodicidad que elijas." : "La contratación de estas tarifas estará disponible próximamente."}</p>
-  <div className="grid gap-5 md:grid-cols-3">
-    {(Object.keys(PRICING) as CommercialPlan[]).map(key => {
-      const offer = PRICING[key];
-      return (
-        <div key={key} className="rounded-3xl border border-slate-200 bg-white p-7">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{offer.name}</p>
-          <div className="mt-3 text-4xl font-bold text-slate-900">
-            {(offer[interval] / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
-          </div>
-          <p className="mt-2 text-sm text-slate-500">MXN / {interval === "monthly" ? "mes" : "año"} · IVA incluido</p>
-          <button type="button" disabled={!enabled || procesandoPlan !== null}
-            onClick={() => void contratarPlan(key)}
-            className="mt-7 w-full rounded-xl bg-green-700 px-5 py-3 text-white disabled:bg-slate-200 disabled:text-slate-600">
-            {procesandoPlan === key ? "Abriendo Mercado Pago…" : enabled ? "Contratar " + offer.name : "Próximamente"}
-          </button>
-        </div>
-      );
-    })}
-  </div>
-</div>
-
-      </div>
-    </main>
-  );
+  </>;
 }
