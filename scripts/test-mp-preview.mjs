@@ -16,7 +16,8 @@ registerHooks({ resolve(name, context, next) {
   return next(name, context);
 } });
 
-const slug = "qa-pricing-v1-mp-mx";
+const webhookTest = process.argv.includes("--webhook-checkout");
+const slug = webhookTest ? "qa-pricing-v1-webhook-mx" : "qa-pricing-v1-mp-mx";
 const { billingConfig, mpRead, mpRequest, readAgreement } = await import("../lib/billing-server.ts");
 const { checkoutLink, cents } = await import("../lib/billing-provider.ts");
 const config = billingConfig();
@@ -82,7 +83,7 @@ const cases = [
   ["business","monthly",199],["business","annual",1999],["basic","monthly",49],
 ];
 for (const [plan,interval,total] of cases) {
-  if (process.argv.includes("--basic-monthly") && (plan!=="basic" || interval!=="monthly")) continue;
+  if ((webhookTest || process.argv.includes("--basic-monthly")) && (plan!=="basic" || interval!=="monthly")) continue;
   const months = interval === "annual"?12:1;
   const price = unwrap(await admin.from("billing_prices").select("id").eq("version","v1").eq("tier",plan)
     .eq("interval_months",months).single(),"tarifa");
@@ -100,6 +101,10 @@ for (const [plan,interval,total] of cases) {
       remote.auto_recurring?.currency_id!=="MXN" || cents(remote.auto_recurring?.transaction_amount)!==total*100 ||
       remote.auto_recurring?.frequency!==months || remote.auto_recurring.frequency_type!=="months" ||
       checkoutLink(remote)!==checkout.checkout_url) throw new Error("Contrato de prueba inesperado");
+  if (webhookTest) {
+    console.log("QA_WEBHOOK_CHECKOUT", checkout.checkout_url);
+    break;
+  }
   const args = { checkout_id:checkout.checkout_id,preapproval_id:remote.id };
   const verified = await confirm.POST(post(args));
   if (!verified.ok || (await verified.json()).status!=="pending") throw new Error("Confirmación pendiente inesperada");
