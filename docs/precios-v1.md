@@ -73,3 +73,9 @@ Para crear un comprador adicional con el correo que entrega la API, el titular p
 - La UI de superadministrador puede asignar planes manualmente. En un negocio con contrato de pago, gestionar cualquier modificación comercial desde Mercado Pago y conciliar el cambio para mantener acceso y cobro alineados.
 
 [Suscripción pendiente en Mercado Pago](https://www.mercadopago.com.mx/developers/es/docs/subscriptions/integration-configuration/subscription-no-associated-plan/pending-payments) · [Referencia de facturas](https://www.mercadopago.com.mx/developers/es/reference/online-payments/subscriptions/get-authorized-payment/get)
+
+## Validación de extremo a extremo del 25 de noviembre
+
+En el negocio aislado de cancelación, una preautorización cancelada en Mercado Pago pasó a cancelada en DEV sin invocar el retorno. El negocio conservó Free y cero cuotas. Después, en un checkout independiente, el comprador aprobó Básico mensual por 49 MXN y permaneció en el recibo. Supabase DEV registró el contrato autorizado, el plan Básico activo vinculado al mismo contrato y una sola cuota aprobada de 4900 centavos con el identificador del recibo. El próximo cobro indicado fue el 25 de diciembre.
+
+Para probar las demás modalidades sin sustituir un contrato activo, usar un negocio QA distinto por combinación y ejecutar en Preview el script de pruebas con `--paid-offer` seguido de la combinación (por ejemplo, `pro-annual`). El administrador del POS y el comprador de Mercado Pago tienen identidades separadas en esta prueba. Comprobar después de cada aprobación el vínculo del negocio, el importe de la cuota, la periodicidad y el estado de la suscripción.
