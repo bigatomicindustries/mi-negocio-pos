@@ -9,6 +9,29 @@ registerHooks({resolve(name, ctx, next) {
 }});
 const {supabaseAdmin:db}=await import("../lib/supabaseAdmin.ts");
 const {readAgreement,reconcile,recordInvoice,mpRead}=await import("../lib/billing-server.ts");
+if (process.argv.includes("--inspect-offers")) {
+  const slugs = ["basic-annual","pro-monthly","pro-annual","business-monthly","business-annual"]
+    .map(offer => "qa-pricing-v1-" + offer);
+  const {data, error} = await db.from("billing_contracts")
+    .select("id,provider_id,businesses!inner(slug),billing_prices!inner(amount_cents,interval_months)")
+    .in("businesses.slug", slugs).eq("status", "authorized");
+  if (error || data.length !== 5) throw Error("Se esperaban cinco contratos de QA autorizados");
+  for (const contract of data) {
+    const agreement = await readAgreement(contract.provider_id);
+    if (agreement.external_reference !== "mn-v1:" + contract.id ||
+        String(agreement.application_id) !== process.env.MP_V1_APPLICATION_ID ||
+        String(agreement.collector_id) !== process.env.MP_V1_COLLECTOR_ID) throw Error("Contrato de QA inesperado");
+    const result = await mpRead("/authorized_payments/search?preapproval_id=" + encodeURIComponent(contract.provider_id));
+    console.log("QA_CUOTAS", contract.businesses.slug, result.results.length);
+    for (const row of result.results) {
+      const invoice = await mpRead("/authorized_payments/" + encodeURIComponent(row.id));
+      if (invoice.preapproval_id !== agreement.id || String(invoice.id) !== String(row.id)) throw Error("Cuota ajena");
+      console.log("QA_CUOTA", contract.businesses.slug, invoice.status, invoice.payment?.status,
+        invoice.transaction_amount, invoice.currency_id, invoice.payment?.id ?? "sin_pago");
+    }
+  }
+  process.exit(0);
+}
 const id=process.argv[2];
 const {data:business,error}=await db.from("businesses").select("id").eq("slug","qa-pricing-v1-mp-mx").single();
 if(error) throw Error("Negocio de prueba no disponible");
