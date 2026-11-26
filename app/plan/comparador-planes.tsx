@@ -6,10 +6,10 @@ import { PRICING, type BillingInterval, type CommercialPlan } from "@/lib/pricin
 
 const planes = ["free", "basic", "pro", "business"] as const;
 const detalles = {
-  free: ["2 usuarios", "100 productos", "1 sucursal", "Punto de venta e inventario"],
-  basic: ["2 usuarios", "100 productos", "1 sucursal", "Punto de venta e inventario", "Historial de ventas y corte de caja", "Reportes básicos"],
-  pro: ["10 usuarios", "5,000 productos", "1 sucursal", "Todo lo de Básico", "Compras y proveedores", "Empleados y alertas de stock"],
-  business: ["50 usuarios", "50,000 productos", "3 sucursales", "Todo lo de Pro", "Reportes avanzados", "Soporte prioritario"],
+  free: ["1 usuario", "100 productos", "1 sucursal", "Punto de venta e inventario"],
+  basic: ["1 usuario", "100 productos", "1 sucursal", "Punto de venta e inventario", "Historial de ventas y corte de caja", "Reportes básicos"],
+  pro: ["3 usuarios", "1,000 productos", "1 sucursal", "Todo lo de Básico", "Compras y proveedores", "Empleados y alertas de stock"],
+  business: ["10 usuarios", "10,000 productos", "3 sucursales", "Todo lo de Pro", "Reportes avanzados", "Soporte prioritario"],
 };
 const moneda = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
