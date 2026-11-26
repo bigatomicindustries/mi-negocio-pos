@@ -147,7 +147,7 @@ useEffect(() => {
         setMostrarUsuario(false);
       }}
     >
-      <p className="truncate text-[11px] font-bold uppercase tracking-[0.18em] text-green-600">
+      <p className="truncate text-sm font-bold uppercase tracking-[0.18em] text-green-600">
         {negocio?.name || "Mi Negocio"}
       </p>
     </Link>
@@ -473,7 +473,7 @@ className={`text-xs transition-transform duration-200 ${
           href="/"
           className="shrink-0"
         >
-<p className="max-w-[220px] truncate text-xs font-bold uppercase tracking-[0.18em] text-green-600">
+<p className="max-w-[220px] truncate text-base font-bold uppercase tracking-[0.18em] text-green-600">
   {negocio?.name || "Mi Negocio"}
 </p>
         </Link>
