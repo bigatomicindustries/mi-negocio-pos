@@ -257,7 +257,12 @@ function NegocioCRMContent(){
     <span className="font-bold">Nota fija</span>
     <textarea value={editNote} onChange={e=>setEditNote(e.target.value)} disabled={saving||readOnly} rows={4} placeholder="Escribe una nota sobre esta oportunidad" className="min-h-24 flex-1 resize-y rounded-xl border bg-white p-3 text-sm"/>
    </label>
-  </div><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label></form><OpportunityCommercialOverview key={editing.id} opportunityId={editing.id} revision={agendaRevision} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/><p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p><BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/></div></div>}
+  </div><label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" required value={editAmount} onChange={e=>setEditAmount(e.target.value)}/></label></form>
+  <div className="mt-5 grid items-start gap-4 md:grid-cols-2">
+   <BusinessOpportunityActivities businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}/>
+   <OpportunityCommercialOverview key={editing.id} opportunityId={editing.id} revision={agendaRevision} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/>
+  </div>
+  <p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p></div></div>}
   {section==="contactos"&&<BusinessContacts userId={user!.id} behindDialog={!!editing||dialog==="opportunity"} relationRevision={agendaRevision}
     onCreateOpportunity={c=>{openDialog("opportunity");setContact(c.id);setProfileContact(c);}}
     onOpenOpportunity={(o,c)=>{setProfileContact(c);showOpportunity(o);}} totalContacts={contactCount} businessId={negocio!.id} onSaved={load}/>}
