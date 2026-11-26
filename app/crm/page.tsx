@@ -246,9 +246,12 @@ function NegocioCRMContent(){
    </h2>
    <div className="flex flex-wrap items-center gap-2">
     {editDirty&&<button form="crm-edit-opportunity" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}
-    <select aria-label="Etapa de la oportunidad" form="crm-edit-opportunity" disabled={saving||readOnly} className="rounded-xl border bg-white px-3 py-2 text-sm font-semibold" value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>
+    <div className="relative">
+     <select aria-label="Etapa de la oportunidad" form="crm-edit-opportunity" disabled={saving||readOnly} className="appearance-none rounded-xl border bg-white pl-3 pr-9 py-2 text-sm font-semibold" value={editStage} onChange={e=>setEditStage(e.target.value as CRMStage)}>
      {stages.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
     </select>
+     <span aria-hidden="true" className="pointer-events-none absolute right-3.5 top-1/2 -mt-1.5 h-2 w-2 rotate-45 border-b-2 border-r-2" />
+    </div>
     <button type="button" disabled={saving} onClick={closeOpportunity} className="rounded-xl border px-4 py-2 text-sm font-semibold">{editDirty?"Cancelar":"Cerrar"}</button>
    </div>
   </div>{editError&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{editError}</p>}<form id="crm-edit-opportunity" onSubmit={saveOpportunity} className="mt-5 space-y-4"><div className="grid gap-4 sm:grid-cols-2">
