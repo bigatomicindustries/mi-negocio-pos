@@ -155,7 +155,7 @@ function NegocioCRMContent(){
   {error&&!dialog&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
   {section==="resumen"&&<div className="space-y-6">
-   <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-900">Resumen comercial</h2><p className="mt-1 text-sm text-slate-500">Indicadores y próximos seguimientos de tu negocio</p></div><Link href="/crm?seccion=contactos" className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Gestionar contactos</Link></div>
+   <div><h2 className="text-xl font-bold text-slate-900">Resumen comercial</h2><p className="mt-1 text-sm text-slate-500">Indicadores y próximos seguimientos de tu negocio</p></div>
    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
     {label:"Contactos activos",value:contactCount,detail:"Directorio comercial",href:"contactos"},
     {label:"Oportunidades",value:metrics?totalOpps:"—",detail:metrics?money(totalAmount)+" estimados":"Sin datos actualizados",href:"oportunidades"},
