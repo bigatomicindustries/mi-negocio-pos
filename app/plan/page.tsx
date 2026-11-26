@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { PRICING, type BillingInterval, type CommercialPlan } from "@/lib/pricing-v1";
 
 type Suscripcion = {
   plan_name: string;
@@ -19,253 +20,95 @@ type Suscripcion = {
 };
 
 export default function PlanPage() {
+  return <Suspense fallback={<main className="p-6">Cargando plan…</main>}><PlanContent /></Suspense>;
+}
+
+async function billingPost(path: string, body: Record<string, unknown>) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "No pudimos completar la operación.");
+  return result;
+}
+
+function PlanContent() {
   const router = useRouter();
-
-  const searchParams = useSearchParams();
-
-const preapprovalId = searchParams.get("preapproval_id");
-
-  const {
-    perfil,
-    negocio,
-  } = useAuth();
-
-const [suscripcion, setSuscripcion] =
-  useState<Suscripcion | null>(null);
-
-const [loading, setLoading] = useState(true);
-const [error, setError] = useState("");
-
-const [procesandoPlan, setProcesandoPlan] =
-  useState<string | null>(null);
-
-  const [confirmandoSuscripcion, setConfirmandoSuscripcion] =
-  useState(false);
+  const params = useSearchParams();
+  const preapproval = params.get("preapproval_id");
+  const checkout = params.get("checkout_v1");
+  const { perfil, negocio } = useAuth();
+  const [suscripcion, setSuscripcion] = useState<Suscripcion | null>(null);
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
+  const [enabled, setEnabled] = useState(false);
+  const [procesandoPlan, setProcesandoPlan] = useState<CommercialPlan | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-  if (!perfil) return;
-
-  if (perfil.role !== "admin") {
-    router.replace("/");
-    return;
-  }
-
-  void cargarSuscripcion();
-}, [perfil?.id, perfil?.role, router]);
-
-  useEffect(() => {
-  if (!perfil) return;
-  if (perfil.role !== "admin") return;
-  if (!preapprovalId) return;
-
-  void confirmarSuscripcionMercadoPago();
-}, [perfil, preapprovalId]);
-
-async function confirmarSuscripcionMercadoPago() {
-  try {
-    setConfirmandoSuscripcion(true);
-    setError("");
-
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (
-      sessionError ||
-      !session?.access_token
-    ) {
-      throw new Error(
-        "Tu sesión ha expirado. Inicia sesión nuevamente."
-      );
-    }
-
-const checkoutId = sessionStorage.getItem(
-  "mercadopago_checkout_id"
-);
-
-    const response = await fetch(
-      "/api/mercadopago/confirm-subscription",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-body: JSON.stringify({
-  preapproval_id: preapprovalId,
-  ...(checkoutId ? { checkout_id: checkoutId } : {}),
-}),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          "No pudimos confirmar tu suscripción."
-      );
-    }
-
-    // Volvemos a consultar Supabase para mostrar
-    // inmediatamente el nuevo plan.
-    await cargarSuscripcion();
-
-    sessionStorage.removeItem(
-  "mercadopago_checkout_id"
-);
-
-    // Quitamos el preapproval_id de la URL para evitar
-    // volver a procesarlo al recargar la página.
-    router.replace("/plan");
-  } catch (error: any) {
-    console.error(
-      "Error confirmando suscripción:",
-      error
-    );
-
-    setError(
-      error?.message ||
-        "No pudimos confirmar tu suscripción."
-    );
-  } finally {
-    setConfirmandoSuscripcion(false);
-  }
-}
-
-async function cargarSuscripcion() {
-  try {
+    if (!perfil?.id) return;
+    if (perfil.role !== "admin") { router.replace("/"); return; }
     setLoading(true);
-      setError("");
+    setSubscriptionLoaded(false);
+    setSuscripcion(null);
+    setEnabled(false);
+    let current = true;
+    async function load() {
+      try {
+        if (preapproval || checkout) {
+          try {
+            const legacyId = checkout ? null : sessionStorage.getItem("mercadopago_checkout_id");
+            const result = await billingPost(checkout ? "/api/mercadopago/v1/confirm" : "/api/mercadopago/confirm-subscription", {
+              preapproval_id: preapproval, checkout_id: checkout || legacyId,
+            });
+            if (!current) return;
+            if (!checkout) sessionStorage.removeItem("mercadopago_checkout_id");
+            const messages: Record<string,string> = {
+              pending: "Mercado Pago aún está esperando la autorización. Puedes retomar la contratación del mismo plan.",
+              authorized: "Mercado Pago confirmó la autorización de tu suscripción.",
+              cancelled: "La contratación se canceló.", paused: "La suscripción está pausada.",
+            };
+            setNotice(messages[result.status] || "Suscripción confirmada.");
+            router.replace("/plan");
+          } catch (e) { if (current) setError(e instanceof Error ? e.message : "No se pudo confirmar la suscripción."); }
+        }
+        const { data, error: dbError } = await supabase.rpc("get_my_subscription");
+        if (dbError) throw new Error("No se pudo consultar la suscripción del negocio.");
+        if (current) {
+          setSuscripcion(data?.[0] ?? null);
+          setSubscriptionLoaded(true);
+        }
+        const ready = await fetch("/api/mercadopago/subscribe", {cache:"no-store"});
+        if (ready.ok) {
+          const settings = await ready.json();
+          if (current) setEnabled(settings.enabled === true);
+        }
+      } catch (e) {
+        if (current) setError(e instanceof Error ? e.message : "No se pudo consultar el plan.");
+      } finally { if (current) setLoading(false); }
+    }
+    void load();
+    return () => { current = false; };
+  }, [perfil?.id, perfil?.role, router, checkout, preapproval]);
 
-      const {
-        data,
-        error: suscripcionError,
-      } = await supabase.rpc(
-        "get_my_subscription"
-      );
-
-      if (suscripcionError) {
-        throw suscripcionError;
-      }
-
-if (!data || data.length === 0) {
-  throw new Error(
-    "No encontramos una suscripción para este negocio."
-  );
-}
-
-setSuscripcion(data[0]);
-
-  } catch (error: any) {
-    console.error(
-      "Error cargando suscripción:",
-      error
-    );
-
-    setError(
-      error?.message ||
-        "No se pudo cargar la información del plan."
-    );
-  } finally {
-    setLoading(false);
-  }
-}
-
-async function contratarPlan(
-  plan: "pro" | "business"
-) {
-  try {
+  async function contratarPlan(plan: CommercialPlan) {
     setProcesandoPlan(plan);
     setError("");
-
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (
-      sessionError ||
-      !session?.access_token
-    ) {
-      throw new Error(
-        "Tu sesión ha expirado. Inicia sesión nuevamente."
-      );
+    setNotice("");
+    try {
+      const result = await billingPost("/api/mercadopago/subscribe", {plan, interval});
+      if (!result.success || !result.checkout_url) throw new Error("No se recibió el enlace de contratación.");
+      window.location.assign(result.checkout_url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo iniciar la contratación.");
+      setProcesandoPlan(null);
     }
-
-    const response = await fetch(
-      "/api/mercadopago/subscribe",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:
-            `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          plan,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          "No se pudo iniciar la suscripción."
-      );
-    }
-
-    if (
-      !data.success ||
-      typeof data.checkout_url !== "string"
-    ) {
-      throw new Error(
-        "No se recibió el checkout de Mercado Pago."
-      );
-    }
-
-    if (!data.checkout_id) {
-  throw new Error(
-    "No se recibió el identificador del checkout."
-  );
-}
-
-sessionStorage.setItem(
-  "mercadopago_checkout_id",
-  data.checkout_id
-);
-
-setProcesandoPlan(null);
-
-window.location.href = data.checkout_url;
-  } catch (error: any) {
-    console.error(
-      "Error contratando plan:",
-      error
-    );
-
-    setError(
-      error?.message ||
-        "No se pudo iniciar la suscripción."
-    );
-
-    setProcesandoPlan(null);
-  }
-}
-
-  function porcentaje(
-    actual: number,
-    maximo: number
-  ) {
-    if (maximo <= 0) return 0;
-
-    return Math.min(
-      100,
-      Math.round((actual / maximo) * 100)
-    );
   }
 
   if (loading) {
@@ -280,7 +123,7 @@ window.location.href = data.checkout_url;
     );
   }
 
-  if (error || !suscripcion) {
+  if (!suscripcion && error && !subscriptionLoaded) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-12">
         <div className="mx-auto max-w-5xl">
@@ -292,24 +135,6 @@ window.location.href = data.checkout_url;
       </main>
     );
   }
-
-  const porcentajeUsuarios = porcentaje(
-    Number(suscripcion.current_users),
-    Number(suscripcion.max_users)
-  );
-
-  const porcentajeProductos = porcentaje(
-    Number(suscripcion.current_products),
-    Number(suscripcion.max_products)
-  );
-
-  const usuariosAlLimite =
-    Number(suscripcion.current_users) >=
-    Number(suscripcion.max_users);
-
-  const productosAlLimite =
-    Number(suscripcion.current_products) >=
-    Number(suscripcion.max_products);
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-12">
@@ -331,6 +156,91 @@ window.location.href = data.checkout_url;
           </p>
         </div>
 
+        {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
+        {notice && <p role="status" className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">{notice}</p>}
+
+        {suscripcion ? <PlanActual suscripcion={suscripcion} /> : <p className="mt-8">Este negocio aún no tiene una suscripción.</p>}
+
+        {/* CAMBIAR DE PLAN */}
+
+<div className="mt-6">
+  <div className="mb-5">
+    <h2 className="text-xl font-bold text-slate-900">
+      {suscripcion ? "¿Necesitas más capacidad?" : "Planes disponibles"}
+    </h2>
+
+    <p className="mt-2 text-slate-500">
+      Elige el plan que mejor se adapte a tu negocio.
+    </p>
+  </div>
+
+  <div className="mb-5 flex gap-2">
+    {(["monthly", "annual"] as const).map(value => (
+      <button key={value} type="button" aria-pressed={interval === value}
+        onClick={() => setInterval(value)}
+        className={`rounded-xl border px-4 py-2 ${interval === value ? "bg-green-700 text-white" : "bg-white text-slate-700"}`}>
+        {value === "monthly" ? "Mensual" : "Anual"}
+      </button>
+    ))}
+  </div>
+  <p className="mb-4 text-sm text-slate-500">{enabled ? "La suscripción se renueva con la periodicidad que elijas." : "La contratación de estas tarifas estará disponible próximamente."}</p>
+  <div className="grid gap-5 md:grid-cols-3">
+    {(Object.keys(PRICING) as CommercialPlan[]).map(key => {
+      const offer = PRICING[key];
+      return (
+        <div key={key} className="rounded-3xl border border-slate-200 bg-white p-7">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{offer.name}</p>
+          <div className="mt-3 text-4xl font-bold text-slate-900">
+            {(offer[interval] / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">MXN / {interval === "monthly" ? "mes" : "año"} · IVA incluido</p>
+          <button type="button" disabled={!enabled || procesandoPlan !== null}
+            onClick={() => void contratarPlan(key)}
+            className="mt-7 w-full rounded-xl bg-green-700 px-5 py-3 text-white disabled:bg-slate-200 disabled:text-slate-600">
+            {procesandoPlan === key ? "Abriendo Mercado Pago…" : enabled ? "Contratar " + offer.name : "Próximamente"}
+          </button>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+      </div>
+    </main>
+  );
+}
+function PlanActual({ suscripcion }: { suscripcion: Suscripcion }) {
+  function porcentaje(
+    actual: number,
+    maximo: number
+  ) {
+    if (maximo <= 0) return 0;
+
+    return Math.min(
+      100,
+      Math.round((actual / maximo) * 100)
+    );
+  }
+
+  const porcentajeUsuarios = porcentaje(
+    Number(suscripcion.current_users),
+    Number(suscripcion.max_users)
+  );
+
+  const porcentajeProductos = porcentaje(
+    Number(suscripcion.current_products),
+    Number(suscripcion.max_products)
+  );
+
+  const usuariosAlLimite =
+    Number(suscripcion.current_users) >=
+    Number(suscripcion.max_users);
+
+  const productosAlLimite =
+    Number(suscripcion.current_products) >=
+    Number(suscripcion.max_products);
+
+  return <>
         {/* PLAN ACTUAL */}
 
         <div className="mt-10 rounded-3xl border bg-white p-8">
@@ -474,125 +384,5 @@ window.location.href = data.checkout_url;
           </div>
         </div>
 
-        {/* CAMBIAR DE PLAN */}
-
-<div className="mt-6">
-  <div className="mb-5">
-    <h2 className="text-xl font-bold text-slate-900">
-      ¿Necesitas más capacidad?
-    </h2>
-
-    <p className="mt-2 text-slate-500">
-      Elige el plan que mejor se adapte a tu negocio.
-    </p>
-  </div>
-
-  <div className="grid gap-5 md:grid-cols-2">
-    {/* PLAN PRO */}
-    <div className="rounded-3xl border border-slate-200 bg-white p-7">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Pro
-        </p>
-
-        <div className="mt-3 flex items-end gap-1">
-          <span className="text-4xl font-bold text-slate-900">
-            $299
-          </span>
-
-          <span className="mb-1 text-slate-500">
-            MXN / mes
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3 text-sm text-slate-600">
-        <p>✓ Hasta 10 usuarios</p>
-        <p>✓ Hasta 5,000 productos</p>
-        <p>✓ Ventas e inventario</p>
-        <p>✓ Historial y control de caja</p>
-      </div>
-
-<button
-  type="button"
-  onClick={() => void contratarPlan("pro")}
-  disabled={
-    procesandoPlan !== null ||
-    (
-      suscripcion?.plan_slug === "pro" &&
-      suscripcion?.status !== "cancelled"
-    )
-  }
-  className="mt-7 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
->
-  {procesandoPlan === "pro"
-    ? "Abriendo Mercado Pago..."
-    : suscripcion?.plan_slug === "pro" &&
-      suscripcion?.status === "cancelled"
-    ? "Volver a contratar Pro"
-    : suscripcion?.plan_slug === "pro"
-    ? "Plan actual"
-    : "Elegir Pro"}
-</button>
-    </div>
-
-    {/* PLAN BUSINESS */}
-    <div className="rounded-3xl border border-slate-900 bg-white p-7 shadow-sm">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Business
-          </p>
-
-          <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-            Mayor capacidad
-          </span>
-        </div>
-
-        <div className="mt-3 flex items-end gap-1">
-          <span className="text-4xl font-bold text-slate-900">
-            $699
-          </span>
-
-          <span className="mb-1 text-slate-500">
-            MXN / mes
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3 text-sm text-slate-600">
-        <p>✓ Hasta 50 usuarios</p>
-        <p>✓ Hasta 50,000 productos</p>
-        <p>✓ Ventas e inventario</p>
-        <p>✓ Historial y control de caja</p>
-      </div>
-
-<button
-  type="button"
-  onClick={() => void contratarPlan("business")}
-  disabled={
-    procesandoPlan !== null ||
-    (
-      suscripcion?.plan_slug === "business" &&
-      suscripcion?.status !== "cancelled"
-    )
-  }
-  className="mt-7 w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
->
-  {procesandoPlan === "business"
-    ? "Abriendo Mercado Pago..."
-    : suscripcion?.plan_slug === "business" &&
-      suscripcion?.status === "cancelled"
-    ? "Volver a contratar Business"
-    : suscripcion?.plan_slug === "business"
-    ? "Plan actual"
-    : "Elegir Business"}
-</button>
-    </div>
-  </div>
-</div>
-
-      </div>
-    </main>
-  );
+  </>;
 }

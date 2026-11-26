@@ -9,15 +9,13 @@ const MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Estos IDs corresponden a nuestra aplicación/cuenta sandbox actual.
-// Más adelante podemos moverlos a variables de entorno.
-const EXPECTED_MP_COLLECTOR_ID = 3732279320;
-const EXPECTED_MP_APPLICATION_ID = 1755510569455424;
+const EXPECTED_MP_COLLECTOR_ID = process.env.MERCADOPAGO_COLLECTOR_ID;
+const EXPECTED_MP_APPLICATION_ID = process.env.MERCADOPAGO_APPLICATION_ID;
 
 export async function POST(request: Request) {
   try {
     if (
-      !MERCADOPAGO_ACCESS_TOKEN ||
+      !MERCADOPAGO_ACCESS_TOKEN || !EXPECTED_MP_COLLECTOR_ID || !EXPECTED_MP_APPLICATION_ID ||
       !SUPABASE_URL ||
       !SUPABASE_ANON_KEY
     ) {
@@ -212,8 +210,8 @@ if (
     }
 
     if (
-      Number(mpSubscription.collector_id) !== EXPECTED_MP_COLLECTOR_ID ||
-      Number(mpSubscription.application_id) !== EXPECTED_MP_APPLICATION_ID
+      String(mpSubscription.collector_id) !== EXPECTED_MP_COLLECTOR_ID ||
+      String(mpSubscription.application_id) !== EXPECTED_MP_APPLICATION_ID
     ) {
       console.error("Preapproval pertenece a otra cuenta/aplicación");
 

@@ -247,59 +247,11 @@ if (!mpResponse.ok) {
     const preapproval =
       await mpResponse.json();
 
-// 5. Validar que la suscripción pertenece
-// a nuestra cuenta de Mercado Pago.
-
-if (
-  String(preapproval?.collector_id) !==
-  collectorId
-) {
-  console.error(
-    "Webhook rechazado: collector_id no coincide",
-    {
-      mercadopagoSubscriptionId:
-        preapproval?.id,
-      collectorIdRecibido:
-        preapproval?.collector_id,
+    if (preapproval?.id !== dataId ||
+        String(preapproval.collector_id) !== collectorId ||
+        String(preapproval.application_id) !== applicationId) {
+      return NextResponse.json({ received: true, ignored: true, reason: "account_or_resource_mismatch" });
     }
-  );
-
-  // 6. Validar que la suscripción pertenece
-// a nuestra aplicación de Mercado Pago.
-
-if (
-  String(preapproval?.application_id) !==
-  applicationId
-) {
-  console.error(
-    "Webhook rechazado: application_id no coincide",
-    {
-      mercadopagoSubscriptionId:
-        preapproval?.id,
-      applicationIdRecibido:
-        preapproval?.application_id,
-    }
-  );
-
-  return NextResponse.json(
-    {
-      received: true,
-      ignored: true,
-      reason: "application_mismatch",
-    },
-    { status: 200 }
-  );
-}
-
-  return NextResponse.json(
-    {
-      received: true,
-      ignored: true,
-      reason: "collector_mismatch",
-    },
-    { status: 200 }
-  );
-}
 
 const {
   data: suscripcionLocal,
