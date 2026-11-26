@@ -36,3 +36,8 @@ body {
 html:has(#comparador-planes[open]) {
   overflow: hidden;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .trial-confetti { position: absolute; top: -12px; height: 10px; width: 5px; animation: trial-fall 1.5s ease-in both; }
+  @keyframes trial-fall { from { transform: translateY(-10px) rotate(0); } to { transform: translateY(420px) rotate(320deg); opacity: 0; } }
+}

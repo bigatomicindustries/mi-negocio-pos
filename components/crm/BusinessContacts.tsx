@@ -1,5 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
+import DownloadContacts from "./DownloadContacts";
+import {useBusinessTrial} from "@/app/components/BusinessTrial";
 import {supabase} from "@/lib/supabase";
 type Medio={tipo:"correo"|"telefono";valor:string};
 type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;created_at:string};
@@ -12,6 +14,8 @@ const blank:FormData={nombre:"",apellido:"",empresa:"",direccion:"",notas:"",cor
 const field="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
 const getForm=(c:Contact|null):FormData=>c?{nombre:c.nombre||"",apellido:c.apellido||"",empresa:c.empresa||"",direccion:c.direccion||"",notas:c.notas||"",correo:c.crm_contacto_medios?.find(m=>m.tipo==="correo")?.valor||"",telefono:c.crm_contacto_medios?.find(m=>m.tipo==="telefono")?.valor||""}:{...blank};
 export default function BusinessContacts({businessId,onSaved}:{businessId:string;onSaved:()=>Promise<void>}){
+ const {endsAt,days}=useBusinessTrial();
+ const readOnly=Boolean(endsAt && days===0);
  const [query,setQuery]=useState(""),[selected,setSelected]=useState<Contact|null>(null),[open,setOpen]=useState(false),[form,setForm]=useState<FormData>({...blank}),[original,setOriginal]=useState<FormData>({...blank}),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [tab,setTab]=useState<Tab>("resumen"),[editMode,setEditMode]=useState(false);
  const [page,setPage]=useState(1);
@@ -60,7 +64,7 @@ export default function BusinessContacts({businessId,onSaved}:{businessId:string
  }
  return <section className="space-y-5">
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-   <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">Contactos</h2><p className="mt-1 text-sm text-slate-500">Directorio de clientes y prospectos</p></div><button type="button" onClick={()=>edit(null)} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">+ Nuevo contacto</button></div>
+   <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">Contactos</h2><p className="mt-1 text-sm text-slate-500">Directorio de clientes y prospectos</p></div><DownloadContacts businessId={businessId}/><button disabled={readOnly} type="button" onClick={()=>edit(null)} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">+ Nuevo contacto</button></div>
    {notice&&<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
    <label className="mt-5 block max-w-2xl text-sm font-semibold text-slate-700">Buscar en todos los contactos<input className={field+" mt-2"} value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}} placeholder="Nombre, empresa, teléfono o correo"/></label>
    <p className="mt-3 text-xs text-slate-500">Resultados del directorio · {count} coincidencia{count===1?"":"s"} · 25 por página</p>
@@ -71,7 +75,7 @@ export default function BusinessContacts({businessId,onSaved}:{businessId:string
    <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 sm:px-6"><button type="button" disabled={listLoading||currentPage===1} onClick={()=>setPage(p=>Math.max(1,p-1))} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">Anterior</button><span className="text-sm text-slate-500">Página {currentPage} de {totalPages}</span><button type="button" disabled={listLoading||currentPage===totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">Siguiente</button></div>
   </div>
   {open&&<div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 pt-10" role="presentation"><div role="dialog" aria-modal="true" aria-label={selected?"Perfil comercial del contacto":"Nuevo contacto"} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-   <div className="flex items-center justify-between gap-3"><h3 className="text-xl font-bold">{selected?([selected.nombre,selected.apellido].filter(Boolean).join(" ")||selected.empresa||"Perfil comercial"):"Nuevo contacto"}</h3><div className="flex gap-2">{(!selected||editMode)&&dirty&&<button form="crm-contact-form" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" onClick={cancel} disabled={saving} className="rounded-xl border px-4 py-2 text-sm font-semibold">{dirty?"Cancelar":"Cerrar"}</button></div></div>
+   <div className="flex items-center justify-between gap-3"><h3 className="text-xl font-bold">{selected?([selected.nombre,selected.apellido].filter(Boolean).join(" ")||selected.empresa||"Perfil comercial"):"Nuevo contacto"}</h3><div className="flex gap-2">{(!selected||editMode)&&dirty&&!readOnly&&<button form="crm-contact-form" type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving?"Guardando…":"Guardar"}</button>}<button type="button" onClick={cancel} disabled={saving} className="rounded-xl border px-4 py-2 text-sm font-semibold">{dirty?"Cancelar":"Cerrar"}</button></div></div>
    {error&&<p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
    {selected&&<div className="mt-5 flex gap-2 border-b border-slate-200" role="tablist" aria-label="Secciones del contacto">{(["resumen","datos","actividad"] as Tab[]).map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} onClick={()=>{if(dirty&&!window.confirm("¿Descartar cambios sin guardar?"))return;setForm(getForm(selected));setOriginal(getForm(selected));setEditMode(false);setError("");setTab(t);}} className={"rounded-t-lg px-3 py-2 text-sm font-semibold capitalize "+(tab===t?"border-b-2 border-emerald-700 text-emerald-800":"text-slate-500")}>{t}</button>)}</div>}
    {selected&&tab!=="datos"&&relationsLoading&&<p className="mt-5 text-sm text-slate-500">Cargando relaciones comerciales…</p>}{selected&&tab!=="datos"&&relationsError&&<p role="alert" className="mt-5 text-sm text-red-700">{relationsError}</p>}{selected&&!relationsLoading&&!relationsError&&tab==="resumen"&&<div className="mt-5 space-y-4">
@@ -83,7 +87,7 @@ export default function BusinessContacts({businessId,onSaved}:{businessId:string
    </div>}
    {selected&&!relationsLoading&&!relationsError&&tab==="actividad"&&<div className="mt-5"><p className="mb-3 text-xs text-slate-500">Eventos derivados de oportunidades y tareas registradas. No incluye un historial completo de modificaciones.</p><div className="max-h-96 divide-y overflow-y-auto">{activity.map(a=><div key={a.id} className="py-3"><p className="text-sm font-semibold">{a.label}</p><p className="text-xs text-slate-500">{a.detail} · {new Date(a.date).toLocaleString("es-MX")}</p></div>)}{!activity.length&&<p className="py-4 text-sm text-slate-500">Aún no hay actividad comercial vinculada.</p>}</div></div>}
    {(!selected||tab==="datos")&&<div className="mt-5">
-    {selected&&!editMode&&<div className="mb-4 flex justify-end"><button type="button" onClick={()=>setEditMode(true)} className="rounded-xl border px-4 py-2 text-sm font-semibold">Editar datos</button></div>}
+    {selected&&!editMode&&!readOnly&&<div className="mb-4 flex justify-end"><button type="button" onClick={()=>setEditMode(true)} className="rounded-xl border px-4 py-2 text-sm font-semibold">Editar datos</button></div>}
     <form id="crm-contact-form" onSubmit={save} className="grid gap-3 sm:grid-cols-2">
     {([["nombre","Nombre",120],["apellido","Apellido",120],["empresa","Empresa",180],["correo","Correo",320],["telefono","Teléfono",25],["direccion","Dirección",2000]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-medium">{label}<input disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} maxLength={max} value={form[key]} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))}/></label>)}
     <label className="block text-sm font-medium sm:col-span-2">Notas<textarea disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} rows={3} maxLength={4000} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))}/></label>

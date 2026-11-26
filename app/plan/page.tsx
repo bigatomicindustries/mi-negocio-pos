@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { useBusinessTrial } from "../components/BusinessTrial";
+import DownloadBusinessData from "./DownloadBusinessData";
 import ComparadorPlanes from "./comparador-planes";
 import type { BillingInterval, CommercialPlan } from "@/lib/pricing-v1";
 
@@ -154,12 +156,14 @@ function PlanContent() {
         {notice && <p role="status" className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">{notice}</p>}
 
         {suscripcion ? <PlanActual suscripcion={suscripcion} /> : <p className="mt-8">Este negocio aún no tiene una suscripción.</p>}
+        {negocio?.id && <DownloadBusinessData businessId={negocio.id} />}
 
       </div>
     </main>
   );
 }
 function PlanActual({ suscripcion }: { suscripcion: Suscripcion }) {
+  const { endsAt, days } = useBusinessTrial();
   function porcentaje(
     actual: number,
     maximo: number
@@ -191,7 +195,13 @@ function PlanActual({ suscripcion }: { suscripcion: Suscripcion }) {
     Number(suscripcion.max_products);
 
   return <>
-        {/* PLAN ACTUAL */}
+        {endsAt && <section className="mt-8 rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+          <p>Prueba gratuita de 30 días</p>
+          <h2 className="my-2 text-2xl font-bold text-emerald-800">{days === 0 ? "Tu prueba ha terminado" : days === 1 ? "Te queda 1 día gratis" : `Te quedan ${days} días gratis`}</h2>
+          <progress aria-label="Días disponibles" max={30} value={days} className="w-full accent-emerald-700" />
+          <p>{30-days} de 30 días transcurridos · Vencimiento: {new Date(endsAt).toLocaleString("es-MX", { dateStyle:"long", timeStyle:"short", timeZone:"America/Mexico_City" })} (hora de Ciudad de México)</p>
+          <p className="mt-2">Al terminar, podrás consultar y descargar tu información. Para seguir operando, contrata un plan.</p>
+        </section>}
 
         <div className="mt-10 rounded-3xl border bg-white p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -212,7 +222,7 @@ function PlanActual({ suscripcion }: { suscripcion: Suscripcion }) {
 
             <span className="w-fit rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-700">
               {suscripcion.status === "active"
-                ? "Activo"
+                ? (endsAt && days === 0 ? "Solo lectura" : "Activo")
                 : suscripcion.status}
             </span>
           </div>

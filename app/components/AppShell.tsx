@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { BusinessTrial } from "./BusinessTrial";
 import Navbar from "./Navbar";
 import AuthGuard from "./AuthGuard";
 import {
@@ -17,6 +18,7 @@ function ContenidoPrivado({
   const pathname = usePathname();
 
 const {
+  perfil,
   puedeOperar,
   negocioSuspendido,
   esPlatformAdmin,
@@ -81,7 +83,7 @@ return (
   <>
     <Navbar />
 
-    <div className="relative">
+    <BusinessTrial key={perfil?.id}><div className="relative">
       {children}
 
       {mostrarBloqueoSuscripcion && (
@@ -106,7 +108,7 @@ return (
           </div>
         </div>
       )}
-    </div>
+    </div></BusinessTrial>
   </>
 );
 }

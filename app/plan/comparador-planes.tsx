@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useBusinessTrial } from "../components/BusinessTrial";
 import { PRICING, type BillingInterval, type CommercialPlan } from "@/lib/pricing-v1";
 
 const planes = ["free", "basic", "pro", "business"] as const;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export default function ComparadorPlanes({ suscripcion, ventasHabilitadas, obtenerCheckout }: Props) {
+  const { endsAt, days } = useBusinessTrial();
   const dialogo = useRef<HTMLDialogElement>(null);
   const intento = useRef(0);
   const [intervalo, setIntervalo] = useState<BillingInterval>("monthly");
@@ -96,13 +98,14 @@ export default function ComparadorPlanes({ suscripcion, ventasHabilitadas, obten
                 </div>
                 <p className="mt-3 text-3xl font-bold tracking-tight">
                   {moneda.format(precio / 100)}
-                  <span className="ml-1 text-sm font-normal text-slate-600">{plan === "free" ? "sin costo" : intervalo === "monthly" ? "/ mes" : "/ año"}</span>
+                  <span className="ml-1 text-sm font-normal text-slate-600">{plan === "free" ? "gratis durante 30 días para cuentas nuevas" : intervalo === "monthly" ? "/ mes" : "/ año"}</span>
                 </p>
                 <ul className="my-4 flex-1 space-y-2 border-t border-slate-200 pt-4 text-sm text-slate-700">
-                  {detalles[plan].map(linea => <li key={linea} className="flex gap-2">
+                  {[...detalles[plan], "CRM incluido"].map(linea => <li key={linea} className="flex gap-2">
                     <span aria-hidden="true" className="text-green-700">✓</span>{linea}
                   </li>)}
                 </ul>
+                {plan === "free" && endsAt && <p className="font-semibold text-emerald-800">{days === 0 ? "Prueba finalizada" : days === 1 ? "Te queda 1 día gratis" : `Te quedan ${days} días gratis`}</p>}
                 {plan !== "free" && !contratoVigente && <button type="button"
                   disabled={!ventasHabilitadas || procesando !== null}
                   onClick={() => void contratar(plan)}

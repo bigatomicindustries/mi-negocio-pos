@@ -75,7 +75,7 @@ function NegocioCRMContent(){
   async function check(){
    if(cargando)return;
    setChecking(true);setAllowed(false);
-   if(!user||!negocio||!perfil||!["admin","manager"].includes(perfil.role)){setChecking(false);return;}
+   if(!user||!negocio||!perfil){setChecking(false);return;}
    try{
    const r=await supabase.from("crm_acceso_negocios").select("habilitado").eq("business_id",negocio.id).eq("habilitado",true).maybeSingle();
    if(cancelled)return;

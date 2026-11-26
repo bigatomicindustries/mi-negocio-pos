@@ -78,6 +78,10 @@ const { data: perfil, error: perfilError } = await supabaseAuth
       );
     }
 
+    const trial = await supabaseAuth.rpc("my_trial_end");
+    if (trial.error || (trial.data && Date.parse(trial.data) <= Date.now())) {
+      return NextResponse.json({ error: "Verifica la vigencia del plan antes de crear empleados." }, { status: 403 });
+    }
     if (!perfil.business_id) {
   return NextResponse.json(
     { error: "Tu usuario no tiene un negocio asignado." },

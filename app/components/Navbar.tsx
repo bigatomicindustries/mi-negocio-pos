@@ -191,7 +191,7 @@ className={`text-xs transition-transform duration-200 ${
 {mostrarMas && (
   <div className="fixed left-4 right-4 top-[5.5rem] z-50 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
 
-            {opciones.filter((opcion) => opcion.href !== "/crm" || puedeAdministrar).map((opcion) => {
+            {opciones.map((opcion) => {
               const activo =
                 pathname === opcion.href;
 
@@ -558,7 +558,7 @@ className={`text-xs transition-transform duration-200 ${
 
         {/* NAVEGACIÓN */}
 
-<nav className="flex items-center gap-1">         {opciones.filter((opcion) => opcion.href !== "/crm" || puedeAdministrar).map((opcion) => {
+<nav className="flex items-center gap-1">         {opciones.map((opcion) => {
             const activo = pathname === opcion.href;
 
             return (
