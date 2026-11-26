@@ -3,11 +3,12 @@ import {useEffect,useState} from "react";
 import ContactChannelFields, {type ChannelRow} from "./ContactChannelFields";
 import CrmModal from "./CrmModal";
 import {ContactActivityForm,readContactActivities,type ContactActivityRow} from "./ContactActivity";
+import type {CatalogLine} from "./ProductCatalog";
 import DownloadContacts from "./DownloadContacts";
 import {useBusinessTrial} from "@/app/components/BusinessTrial";
 import {supabase} from "@/lib/supabase";
 type Medio={tipo:"correo"|"telefono";valor:string;etiqueta?:string|null};
-type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;nota_fija:string;updated_at:string;created_at:string};
+type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;partidas:CatalogLine[];nota_fija:string;updated_at:string;created_at:string};
 type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;completada_at:string|null};
 type Tab="resumen"|"datos"|"actividad";
 const money=(n:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
@@ -34,7 +35,7 @@ export default function BusinessContacts({businessId,totalContacts,onSaved,userI
  const [detail,setDetail]=useState<{title:string;date:string;text:string;opportunityId?:string|null}|null>(null);
  const [linked,setLinked]=useState<Opportunity[]>([]),[linkedTasks,setLinkedTasks]=useState<Task[]>([]),[relationsLoading,setRelationsLoading]=useState(false),[relationsError,setRelationsError]=useState("");
  useEffect(()=>{let cancelled=false;setLinked([]);setLinkedTasks([]);setLogs([]);setRelationsError("");if(!open||!selected||behindDialog||tab==="datos"){setRelationsLoading(false);return;}setRelationsLoading(true);void (async()=>{try{
- const all:Opportunity[]=[];for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,nota_fija,updated_at,created_at").eq("business_id",businessId).eq("contacto_id",selected.id).order("created_at",{ascending:false}).order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;all.push(...(r.data||[]));if((r.data||[]).length<250)break;}
+ const all:Opportunity[]=[];for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,partidas,nota_fija,updated_at,created_at").eq("business_id",businessId).eq("contacto_id",selected.id).order("created_at",{ascending:false}).order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;all.push(...(r.data||[]));if((r.data||[]).length<250)break;}
  const tasks:Task[]=[];for(let i=0;i<all.length;i+=100){for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,completada_at").in("oportunidad_id",all.slice(i,i+100).map(o=>o.id)).order("vence_at").order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;tasks.push(...(r.data||[]));if((r.data||[]).length<250)break;}}
  const history=await readContactActivities(businessId,selected.id);
  if(!cancelled){setLogs(history);setLinked(all);setLinkedTasks(tasks);}

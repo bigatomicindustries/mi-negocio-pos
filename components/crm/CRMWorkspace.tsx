@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-export type CRMSection="resumen"|"contactos"|"oportunidades";
-const tabs:{id:CRMSection;label:string}[]=[{id:"resumen",label:"Inicio"},{id:"oportunidades",label:"Oportunidades"},{id:"contactos",label:"Contactos"}];
+export type CRMSection="resumen"|"contactos"|"oportunidades"|"catalogo";
+const tabs:{id:CRMSection;label:string}[]=[{id:"resumen",label:"Inicio"},{id:"oportunidades",label:"Oportunidades"},{id:"contactos",label:"Contactos"},{id:"catalogo",label:"Catálogo"}];
 export default function CRMWorkspace({basePath,section,children,subtitle}:{basePath:string;section:CRMSection;children:React.ReactNode;subtitle:string}){
  return <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 md:px-8">
   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-8">

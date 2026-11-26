@@ -10,7 +10,7 @@ const sources = {
   cash_sessions: "Sesiones de caja", cash_movements: "Movimientos de caja",
   sale_returns: "Devoluciones de ventas", purchase_returns: "Devoluciones de compras",
   inventory_transfers: "Transferencias de inventario", crm_negocio_oportunidades: "Oportunidades del CRM",
-  crm_negocio_actividades: "Actividades del CRM",
+  crm_negocio_actividades: "Actividades del CRM", crm_catalogo: "Catálogo de productos y servicios",
 } as const;
 
 export default function DownloadBusinessData({ businessId }: { businessId: string }) {
