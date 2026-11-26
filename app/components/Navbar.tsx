@@ -115,6 +115,18 @@ useEffect(() => {
   const primerNombre =
   perfil?.full_name?.trim().split(/\s+/)[0] || "Cuenta";
 
+  const opcionesCuenta = [
+    { href: "/usuarios", nombre: "Empleados", descripcion: "Administra usuarios, roles y accesos", visible: perfil?.role === "admin" },
+    { href: "/configuracion/pagos", nombre: "Configuración", descripcion: "Pagos y transferencias", visible: puedeAdministrar },
+  ].filter(opcion => opcion.visible).map(opcion => (
+    <Link key={opcion.href} href={opcion.href} onClick={() => setMostrarUsuario(false)}
+      aria-current={pathname === opcion.href ? "page" : undefined}
+      className="block rounded-xl px-4 py-3 transition hover:bg-slate-50 aria-[current=page]:bg-slate-100">
+      <p className="text-sm font-semibold text-slate-900">{opcion.nombre}</p>
+      <p className="mt-1 text-xs text-slate-500">{opcion.descripcion}</p>
+    </Link>
+  ));
+
   return (
     <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur">
 
@@ -247,25 +259,6 @@ className={`text-xs transition-transform duration-200 ${
             )}
 
 
-            {/* EMPLEADOS */}
-
-            {perfil?.role === "admin" && (
-              <Link
-                href="/usuarios"
-                onClick={() =>
-                  setMostrarMas(false)
-                }
-                className="block rounded-xl px-4 py-3 transition hover:bg-slate-50"
-              >
-                <p className="text-sm font-semibold text-slate-900">
-                  Empleados
-                </p>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Administra usuarios, roles y accesos
-                </p>
-              </Link>
-            )}
 
             {/* DISPOSITIVOS */}
 
@@ -368,23 +361,6 @@ className={`text-xs transition-transform duration-200 ${
               </p>
             </Link>
 
-{/* CONFIGURACIÓN */}
-
-{puedeAdministrar && (
-  <Link
-    href="/configuracion/pagos"
-    onClick={() => setMostrarMas(false)}
-    className="block rounded-xl px-4 py-3 transition hover:bg-slate-50"
-  >
-    <p className="text-sm font-semibold text-slate-900">
-      Configuración
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Pagos y transferencias
-    </p>
-  </Link>
-)}
 
           </div>
         )}
@@ -444,6 +420,7 @@ className={`text-xs transition-transform duration-200 ${
               </div>
 
 
+              {opcionesCuenta}
               {perfil.role === "admin" && (
                 <Link
                   href="/plan"
@@ -595,9 +572,7 @@ className={`text-xs transition-transform duration-200 ${
       pathname === "/movimientos" ||
       pathname === "/transferencias" ||
       pathname === "/historial-cajas" ||
-      pathname === "/usuarios" ||
-      pathname === "/dispositivos" ||
-      pathname.startsWith("/configuracion")
+      pathname === "/dispositivos"
         ? "bg-slate-900 text-white"
         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
     }`}
@@ -631,21 +606,6 @@ className={`text-xs transition-transform duration-200 ${
   </Link>
 )}
 
-{perfil?.role === "admin" && (
-  <Link
-    href="/usuarios"
-    onClick={() => setMostrarMas(false)}
-    className="block rounded-xl px-4 py-3 transition hover:bg-slate-50"
-  >
-    <p className="text-sm font-semibold text-slate-900">
-      Empleados
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Administra usuarios, roles y accesos
-    </p>
-  </Link>
-)}
 
                 <Link
                   href="/historial"
@@ -705,23 +665,6 @@ className={`text-xs transition-transform duration-200 ${
                   </p>
                 </Link>
 
-{/* CONFIGURACIÓN */}
-
-{puedeAdministrar && (
-  <Link
-    href="/configuracion/pagos"
-    onClick={() => setMostrarMas(false)}
-    className="block rounded-xl px-4 py-3 transition hover:bg-slate-50"
-  >
-    <p className="text-sm font-semibold text-slate-900">
-      Configuración
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Pagos y transferencias
-    </p>
-  </Link>
-)}
 
               </div>
             )}
@@ -775,6 +718,7 @@ onClick={() => {
                     </p>
                   </div>
 
+                  {opcionesCuenta}
                   {perfil.role === "admin" && (
   <Link
     href="/plan"
