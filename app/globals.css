@@ -33,3 +33,6 @@ body {
 * {
   box-sizing: border-box;
 }
+html:has(#comparador-planes[open]) {
+  overflow: hidden;
+}

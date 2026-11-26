@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { PRICING, type BillingInterval, type CommercialPlan } from "@/lib/pricing-v1";
+import ComparadorPlanes from "./comparador-planes";
+import type { BillingInterval, CommercialPlan } from "@/lib/pricing-v1";
 
 type Suscripcion = {
   plan_name: string;
@@ -36,6 +37,14 @@ async function billingPost(path: string, body: Record<string, unknown>) {
   return result;
 }
 
+async function obtenerCheckout(plan: CommercialPlan, interval: BillingInterval): Promise<string> {
+  const result = await billingPost("/api/mercadopago/subscribe", {plan, interval});
+  if (!result.success || typeof result.checkout_url !== "string" || !result.checkout_url) {
+    throw new Error("No se recibió el enlace de contratación.");
+  }
+  return result.checkout_url;
+}
+
 function PlanContent() {
   const router = useRouter();
   const params = useSearchParams();
@@ -45,9 +54,7 @@ function PlanContent() {
   const [suscripcion, setSuscripcion] = useState<Suscripcion | null>(null);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [enabled, setEnabled] = useState(false);
-  const [procesandoPlan, setProcesandoPlan] = useState<CommercialPlan | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -97,20 +104,6 @@ function PlanContent() {
     return () => { current = false; };
   }, [perfil?.id, perfil?.role, router, checkout, preapproval]);
 
-  async function contratarPlan(plan: CommercialPlan) {
-    setProcesandoPlan(plan);
-    setError("");
-    setNotice("");
-    try {
-      const result = await billingPost("/api/mercadopago/subscribe", {plan, interval});
-      if (!result.success || !result.checkout_url) throw new Error("No se recibió el enlace de contratación.");
-      window.location.assign(result.checkout_url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo iniciar la contratación.");
-      setProcesandoPlan(null);
-    }
-  }
-
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-12">
@@ -146,9 +139,10 @@ function PlanContent() {
             {negocio?.name || "Mi negocio"}
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">
-            Plan y uso
-          </h1>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <h1 className="text-3xl font-bold text-slate-900">Plan y uso</h1>
+            <ComparadorPlanes suscripcion={suscripcion} ventasHabilitadas={enabled} obtenerCheckout={obtenerCheckout} />
+          </div>
 
           <p className="mt-2 text-slate-500">
             Consulta tu plan actual y el uso de
@@ -160,50 +154,6 @@ function PlanContent() {
         {notice && <p role="status" className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">{notice}</p>}
 
         {suscripcion ? <PlanActual suscripcion={suscripcion} /> : <p className="mt-8">Este negocio aún no tiene una suscripción.</p>}
-
-        {/* CAMBIAR DE PLAN */}
-
-<div className="mt-6">
-  <div className="mb-5">
-    <h2 className="text-xl font-bold text-slate-900">
-      {suscripcion ? "¿Necesitas más capacidad?" : "Planes disponibles"}
-    </h2>
-
-    <p className="mt-2 text-slate-500">
-      Elige el plan que mejor se adapte a tu negocio.
-    </p>
-  </div>
-
-  <div className="mb-5 flex gap-2">
-    {(["monthly", "annual"] as const).map(value => (
-      <button key={value} type="button" aria-pressed={interval === value}
-        onClick={() => setInterval(value)}
-        className={`rounded-xl border px-4 py-2 ${interval === value ? "bg-green-700 text-white" : "bg-white text-slate-700"}`}>
-        {value === "monthly" ? "Mensual" : "Anual"}
-      </button>
-    ))}
-  </div>
-  <p className="mb-4 text-sm text-slate-500">{enabled ? "La suscripción se renueva con la periodicidad que elijas." : "La contratación de estas tarifas estará disponible próximamente."}</p>
-  <div className="grid gap-5 md:grid-cols-3">
-    {(Object.keys(PRICING) as CommercialPlan[]).map(key => {
-      const offer = PRICING[key];
-      return (
-        <div key={key} className="rounded-3xl border border-slate-200 bg-white p-7">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{offer.name}</p>
-          <div className="mt-3 text-4xl font-bold text-slate-900">
-            {(offer[interval] / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
-          </div>
-          <p className="mt-2 text-sm text-slate-500">MXN / {interval === "monthly" ? "mes" : "año"} · IVA incluido</p>
-          <button type="button" disabled={!enabled || procesandoPlan !== null}
-            onClick={() => void contratarPlan(key)}
-            className="mt-7 w-full rounded-xl bg-green-700 px-5 py-3 text-white disabled:bg-slate-200 disabled:text-slate-600">
-            {procesandoPlan === key ? "Abriendo Mercado Pago…" : enabled ? "Contratar " + offer.name : "Próximamente"}
-          </button>
-        </div>
-      );
-    })}
-  </div>
-</div>
 
       </div>
     </main>
