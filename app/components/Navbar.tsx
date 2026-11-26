@@ -13,11 +13,6 @@ const opciones = [
     descripcion: "Resumen general de tu negocio",
   },
   {
-    nombre: "CRM",
-    href: "/crm",
-    descripcion: "Contactos, oportunidades y seguimientos",
-  },
-  {
     nombre: "Ventas",
     href: "/ventas",
     descripcion: "Registra y cobra tus ventas",
@@ -31,6 +26,11 @@ const opciones = [
     nombre: "Caja",
     href: "/caja",
     descripcion: "Aperturas, movimientos y cierre",
+  },
+  {
+    nombre: "CRM",
+    href: "/crm",
+    descripcion: "Contactos, oportunidades y seguimientos",
   },
 ];
 

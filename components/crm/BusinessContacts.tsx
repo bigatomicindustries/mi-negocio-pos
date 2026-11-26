@@ -1,19 +1,23 @@
 "use client";
 import {useEffect,useState} from "react";
+import ContactChannelFields, {type ChannelRow} from "./ContactChannelFields";
 import DownloadContacts from "./DownloadContacts";
 import {useBusinessTrial} from "@/app/components/BusinessTrial";
 import {supabase} from "@/lib/supabase";
-type Medio={tipo:"correo"|"telefono";valor:string};
+type Medio={tipo:"correo"|"telefono";valor:string;etiqueta?:string|null};
 type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;created_at:string};
 type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;completada_at:string|null};
 type Tab="resumen"|"datos"|"actividad";
 const money=(n:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
 export type Contact={fuente?:string|null;id:string;nombre:string|null;apellido:string|null;empresa:string|null;direccion:string|null;notas:string|null;updated_at:string;crm_contacto_medios:Medio[]};
 const sources=["Referido","IA","Google","Redes sociales","Página web","WhatsApp","Evento","Visita al negocio","Otro"] as const;
-type FormData={fuente:string;nombre:string;apellido:string;empresa:string;direccion:string;notas:string;correo:string;telefono:string};
-const blank:FormData={fuente:"",nombre:"",apellido:"",empresa:"",direccion:"",notas:"",correo:"",telefono:""};
+type FormData={fuente:string;nombre:string;apellido:string;empresa:string;direccion:string;notas:string;medios:ChannelRow[]};
+const blank:FormData={fuente:"",nombre:"",apellido:"",empresa:"",direccion:"",notas:"",medios:[{key:"correo",tipo:"correo",valor:"",etiqueta:""},{key:"telefono",tipo:"telefono",valor:"",etiqueta:""}]};
 const field="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
-const getForm=(c:Contact|null):FormData=>c?{fuente:c.fuente||"",nombre:c.nombre||"",apellido:c.apellido||"",empresa:c.empresa||"",direccion:c.direccion||"",notas:c.notas||"",correo:c.crm_contacto_medios?.find(m=>m.tipo==="correo")?.valor||"",telefono:c.crm_contacto_medios?.find(m=>m.tipo==="telefono")?.valor||""}:{...blank};
+const getForm=(c:Contact|null):FormData=>c?{fuente:c.fuente||"",nombre:c.nombre||"",apellido:c.apellido||"",empresa:c.empresa||"",direccion:c.direccion||"",notas:c.notas||"",medios:blank.medios.flatMap(empty=>{
+ const rows=c.crm_contacto_medios.filter(m=>m.tipo===empty.tipo);
+ return rows.length?rows.map((m,i)=>({key:m.tipo+i,tipo:m.tipo,valor:m.valor,etiqueta:m.etiqueta||""})):[empty];
+})}:{...blank};
 export default function BusinessContacts({businessId,totalContacts,onSaved}:{businessId:string;totalContacts:number;onSaved:()=>Promise<void>}){
  const {endsAt,days}=useBusinessTrial();
  const readOnly=Boolean(endsAt && days===0);
@@ -56,11 +60,17 @@ export default function BusinessContacts({businessId,totalContacts,onSaved}:{bus
  async function save(e:React.FormEvent){e.preventDefault();if(saving||!dirty&&!selected)return;
   if(!form.nombre.trim()&&!form.empresa.trim()){setError("Indica un nombre o empresa.");return;}
   if(form.nombre.length>120||form.apellido.length>120||form.empresa.length>180||form.direccion.length>2000||form.notas.length>4000){setError("Uno de los campos supera la longitud permitida.");return;}
-  if(form.correo.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())){setError("Revisa el correo.");return;}
-  const digits=form.telefono.replace(/\D/g,"");if(form.telefono.trim()&&(digits.length<7||digits.length>15)){setError("El teléfono debe tener entre 7 y 15 dígitos.");return;}
+  const medios=form.medios.filter(m=>m.valor.trim()).map(({tipo,valor,etiqueta})=>({tipo,valor:valor.trim(),etiqueta:etiqueta.trim()}));
+  if(form.medios.some(m=>m.etiqueta.trim()&&!m.valor.trim())){setError("Completa el correo o teléfono de la etiqueta.");return;}
+  for(const medio of medios){
+   if(medio.tipo==="correo"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(medio.valor)){setError("Revisa el correo "+medio.valor);return;}
+   if(medio.tipo==="telefono"&&!/^\+?[\d ().-]+$/.test(medio.valor)){setError("Ingresa un número de teléfono por campo.");return;}
+   const digits=medio.valor.replace(/\D/g,"");
+   if(medio.tipo==="telefono"&&(digits.length<7||digits.length>15)){setError("Cada teléfono debe tener entre 7 y 15 dígitos.");return;}
+  }
   setSaving(true);setError("");setNotice("");
-  try{const {error:err}=await supabase.rpc("crm_guardar_contacto_con_fuente",{p_fuente:form.fuente||null,p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_correo:form.correo,p_telefono:form.telefono,p_expected_updated_at:selected?.updated_at||null});
-  if(err){setError(err.code==="23505"?"El correo o teléfono ya está registrado en otro contacto de este negocio. No se guardaron cambios.":err.message);setSaving(false);return;}
+  try{const {error:err}=await supabase.rpc("crm_guardar_contacto_con_medios",{p_fuente:form.fuente||null,p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_medios:medios,p_expected_updated_at:selected?.updated_at||null});
+  if(err){setError(err.code==="23505"?"El correo o teléfono está repetido en este negocio. No se guardaron cambios.":err.message);setSaving(false);return;}
   setOpen(false);setEditMode(false);setNotice(selected?"Contacto actualizado.":"Contacto creado.");setRevision(v=>v+1);await onSaved();}catch{setError("No se pudo confirmar el guardado. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  return <section className="space-y-5">
@@ -90,7 +100,8 @@ export default function BusinessContacts({businessId,totalContacts,onSaved}:{bus
    {(!selected||tab==="datos")&&<div className="mt-5">
     {selected&&!editMode&&!readOnly&&<div className="mb-4 flex justify-end"><button type="button" onClick={()=>setEditMode(true)} className="rounded-xl border px-4 py-2 text-sm font-semibold">Editar datos</button></div>}
     <form id="crm-contact-form" onSubmit={save} className="grid gap-3 sm:grid-cols-2">
-    {([["nombre","Nombre",120],["apellido","Apellido",120],["empresa","Empresa",180],["correo","Correo",320],["telefono","Teléfono",25],["direccion","Dirección",2000]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-medium">{label}<input disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} maxLength={max} value={form[key]} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))}/></label>)}
+    {([["nombre","Nombre",120],["apellido","Apellido",120],["empresa","Empresa",180],["direccion","Dirección",2000]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-medium">{label}<input disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} maxLength={max} value={form[key]} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))}/></label>)}
+    {(["correo","telefono"] as const).map(kind=><ContactChannelFields key={kind} kind={kind} rows={form.medios} disabled={saving||readOnly||!!selected&&!editMode} onChange={medios=>setForm(v=>({...v,medios}))}/>)}
     <label className="block text-sm font-medium">Fuente<select className={field+" disabled:bg-slate-50"} value={form.fuente} disabled={saving||readOnly||!!selected&&!editMode} onChange={e=>setForm(v=>({...v,fuente:e.target.value}))}>
       <option value="">Sin especificar</option>
       {sources.map(source=><option key={source} value={source}>{source}</option>)}
