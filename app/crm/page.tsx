@@ -196,13 +196,13 @@ function NegocioCRMContent(){
  if(cargando||checking)return <main className="mx-auto max-w-6xl p-8">Validando acceso al CRM…</main>;
  if(!allowed)return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-bold">CRM no disponible</h1><p className="mt-3 text-slate-600">Tu cuenta no tiene acceso al CRM de este negocio. Consulta al administrador.</p>{error&&<p role="alert" className="mt-3 text-red-700">{error}</p>}</main>;
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido,c.empresa].filter(Boolean).join(" · "):"Contacto no disponible";};
+ const boardTotal=Object.values(boardCounts).reduce((a,b)=>a+b,0);
  const totalOpps=Object.values(metrics?.counts||{}).reduce((a,b)=>a+Number(b),0);
  const totalAmount=Object.values(metrics?.amounts||{}).reduce((a,b)=>a+Number(b),0);
  return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"}>
   {error&&!dialog&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
   {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
   {section==="resumen"&&<div className="space-y-6">
-   <div><h2 className="text-xl font-bold text-slate-900">Resumen comercial</h2><p className="mt-1 text-sm text-slate-500">Indicadores y próximos seguimientos de tu negocio</p></div>
    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
     {label:"Contactos activos",value:contactCount,detail:"Directorio comercial",href:"contactos"},
     {label:"Oportunidades",value:metrics?totalOpps:"—",detail:metrics?money(totalAmount)+" estimados":"Sin datos actualizados",href:"oportunidades"},
@@ -220,7 +220,6 @@ function NegocioCRMContent(){
   </div>}
   {loading&&<p className="text-sm text-slate-500">Actualizando datos…</p>}
   {section==="oportunidades"&&<div className="space-y-6">
-   <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-900">Oportunidades comerciales</h2><p className="mt-1 text-sm text-slate-500">Administra tu pipeline y da seguimiento a cada negociación.</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">{Object.values(boardCounts).reduce((a,b)=>a+b,0)} oportunidades</span><button type="button" disabled={readOnly} onClick={()=>openDialog("opportunity")} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear oportunidad</button></div></div>
    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
     {label:"Oportunidades abiertas",count:stages.filter(s=>s!=="ganado"&&s!=="perdido").reduce((n,s)=>n+(boardCounts[s]||0),0),detail:"En seguimiento"},
     {label:"Valor en negociación",count:metrics?money(stages.filter(s=>s!=="ganado"&&s!=="perdido").reduce((n,s)=>n+Number(metrics.amounts[s]||0),0)):"—",detail:"Monto estimado total"},
@@ -228,7 +227,12 @@ function NegocioCRMContent(){
     {label:"Perdidas",count:boardCounts.perdido||0,detail:"Oportunidades cerradas"}
    ].map(item=><div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{item.label}</p><p className="mt-2 break-words text-2xl font-bold text-slate-900">{item.count}</p><p className="mt-2 text-xs text-slate-500">{item.detail}</p></div>)}</div>
 
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-4"><h3 className="text-lg font-bold">Tablero comercial</h3><p className="mt-1 text-sm text-slate-500">Desliza horizontalmente para ver todas las etapas. Puedes arrastrar tarjetas o cambiar su etapa desde el selector.</p></div><CRMOpportunityBoard rows={boardRows} amounts={metrics?.amounts} counts={boardCounts} pages={boardPages} onPage={(stage,page)=>setBoardPages(old=>({...old,[stage]:page}))} contactName={contactName} busy={saving||loading} onMove={changeStage} onOpen={openOpportunity}/></section>
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-4">
+     <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-lg font-bold">Tablero comercial</h2>
+      <div className="flex flex-wrap items-center gap-2"><span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">{boardTotal} {boardTotal===1?"oportunidad":"oportunidades"}</span><button type="button" disabled={readOnly} onClick={()=>openDialog("opportunity")} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear oportunidad</button></div>
+     </div>
+     <p className="mt-1 text-sm text-slate-500">Desliza horizontalmente para ver todas las etapas. Puedes arrastrar tarjetas o cambiar su etapa desde el selector.</p></div><CRMOpportunityBoard rows={boardRows} amounts={metrics?.amounts} counts={boardCounts} pages={boardPages} onPage={(stage,page)=>setBoardPages(old=>({...old,[stage]:page}))} contactName={contactName} busy={saving||loading} onMove={changeStage} onOpen={openOpportunity}/></section>
   </div>}
     <CrmModal open={dialog==="opportunity"} title="Crear oportunidad" description="Vincula una negociación a un contacto existente." onClose={()=>setDialog(null)} busy={saving} alert={error}>
      <form onSubmit={addOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} value={title} onChange={e=>setTitle(e.target.value)} required/></label>{profileContact?<p className="text-sm">Contacto: <strong>{[profileContact.nombre,profileContact.apellido].filter(Boolean).join(" ")||profileContact.empresa}</strong></p>:<ContactPicker businessId={negocio!.id} value={contact} onChange={setContact} disabled={saving}/>}<label className="block text-sm font-semibold">Valor estimado (MXN)<input className={input+" mt-1"} type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} required/></label><button disabled={saving||!contact} className="w-full rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Crear oportunidad</button>{!contactCount&&<p className="text-sm text-amber-700">Necesitas un contacto registrado para crear oportunidades.</p>}</form>
