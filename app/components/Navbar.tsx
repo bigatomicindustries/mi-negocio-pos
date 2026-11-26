@@ -150,10 +150,6 @@ useEffect(() => {
       <p className="truncate text-[11px] font-bold uppercase tracking-[0.18em] text-green-600">
         {negocio?.name || "Mi Negocio"}
       </p>
-
-      <p className="text-lg font-bold leading-tight text-slate-900">
-        POS
-      </p>
     </Link>
 
 
@@ -480,17 +476,6 @@ className={`text-xs transition-transform duration-200 ${
 <p className="max-w-[220px] truncate text-xs font-bold uppercase tracking-[0.18em] text-green-600">
   {negocio?.name || "Mi Negocio"}
 </p>
-
-<p className="text-lg font-bold text-slate-900">
-  POS
-</p>
-
-{sucursalActiva && (
-  <p className="max-w-[150px] truncate text-[11px] font-medium text-slate-500">
-    {sucursalActiva.name}
-  </p>
-)}
-
         </Link>
 
 {/* SUCURSAL ACTIVA */}
