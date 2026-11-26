@@ -8,12 +8,13 @@ type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_
 type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;completada_at:string|null};
 type Tab="resumen"|"datos"|"actividad";
 const money=(n:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
-export type Contact={id:string;nombre:string|null;apellido:string|null;empresa:string|null;direccion:string|null;notas:string|null;updated_at:string;crm_contacto_medios:Medio[]};
-type FormData={nombre:string;apellido:string;empresa:string;direccion:string;notas:string;correo:string;telefono:string};
-const blank:FormData={nombre:"",apellido:"",empresa:"",direccion:"",notas:"",correo:"",telefono:""};
+export type Contact={fuente?:string|null;id:string;nombre:string|null;apellido:string|null;empresa:string|null;direccion:string|null;notas:string|null;updated_at:string;crm_contacto_medios:Medio[]};
+const sources=["Referido","IA","Google","Redes sociales","Página web","WhatsApp","Evento","Visita al negocio","Otro"] as const;
+type FormData={fuente:string;nombre:string;apellido:string;empresa:string;direccion:string;notas:string;correo:string;telefono:string};
+const blank:FormData={fuente:"",nombre:"",apellido:"",empresa:"",direccion:"",notas:"",correo:"",telefono:""};
 const field="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
-const getForm=(c:Contact|null):FormData=>c?{nombre:c.nombre||"",apellido:c.apellido||"",empresa:c.empresa||"",direccion:c.direccion||"",notas:c.notas||"",correo:c.crm_contacto_medios?.find(m=>m.tipo==="correo")?.valor||"",telefono:c.crm_contacto_medios?.find(m=>m.tipo==="telefono")?.valor||""}:{...blank};
-export default function BusinessContacts({businessId,onSaved}:{businessId:string;onSaved:()=>Promise<void>}){
+const getForm=(c:Contact|null):FormData=>c?{fuente:c.fuente||"",nombre:c.nombre||"",apellido:c.apellido||"",empresa:c.empresa||"",direccion:c.direccion||"",notas:c.notas||"",correo:c.crm_contacto_medios?.find(m=>m.tipo==="correo")?.valor||"",telefono:c.crm_contacto_medios?.find(m=>m.tipo==="telefono")?.valor||""}:{...blank};
+export default function BusinessContacts({businessId,totalContacts,onSaved}:{businessId:string;totalContacts:number;onSaved:()=>Promise<void>}){
  const {endsAt,days}=useBusinessTrial();
  const readOnly=Boolean(endsAt && days===0);
  const [query,setQuery]=useState(""),[selected,setSelected]=useState<Contact|null>(null),[open,setOpen]=useState(false),[form,setForm]=useState<FormData>({...blank}),[original,setOriginal]=useState<FormData>({...blank}),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -58,19 +59,19 @@ export default function BusinessContacts({businessId,onSaved}:{businessId:string
   if(form.correo.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())){setError("Revisa el correo.");return;}
   const digits=form.telefono.replace(/\D/g,"");if(form.telefono.trim()&&(digits.length<7||digits.length>15)){setError("El teléfono debe tener entre 7 y 15 dígitos.");return;}
   setSaving(true);setError("");setNotice("");
-  try{const {error:err}=await supabase.rpc("crm_guardar_contacto_negocio",{p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_correo:form.correo,p_telefono:form.telefono,p_expected_updated_at:selected?.updated_at||null});
+  try{const {error:err}=await supabase.rpc("crm_guardar_contacto_con_fuente",{p_fuente:form.fuente||null,p_contacto_id:selected?.id||null,p_nombre:form.nombre,p_apellido:form.apellido,p_empresa:form.empresa,p_direccion:form.direccion,p_notas:form.notas,p_correo:form.correo,p_telefono:form.telefono,p_expected_updated_at:selected?.updated_at||null});
   if(err){setError(err.code==="23505"?"El correo o teléfono ya está registrado en otro contacto de este negocio. No se guardaron cambios.":err.message);setSaving(false);return;}
   setOpen(false);setEditMode(false);setNotice(selected?"Contacto actualizado.":"Contacto creado.");setRevision(v=>v+1);await onSaved();}catch{setError("No se pudo confirmar el guardado. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  return <section className="space-y-5">
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-   <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">Contactos</h2><p className="mt-1 text-sm text-slate-500">Directorio de clientes y prospectos</p></div><DownloadContacts businessId={businessId}/><button disabled={readOnly} type="button" onClick={()=>edit(null)} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">+ Nuevo contacto</button></div>
+   <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">Contactos</h2><p className="mt-1 text-sm text-slate-500">Directorio de clientes y prospectos</p></div><button disabled={readOnly} type="button" onClick={()=>edit(null)} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">+ Nuevo contacto</button></div>
    {notice&&<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
    <label className="mt-5 block max-w-2xl text-sm font-semibold text-slate-700">Buscar en todos los contactos<input className={field+" mt-2"} value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}} placeholder="Nombre, empresa, teléfono o correo"/></label>
    <p className="mt-3 text-xs text-slate-500">Resultados del directorio · {count} coincidencia{count===1?"":"s"} · 25 por página</p>
   </div>
   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-5 sm:px-6"><h3 className="text-lg font-bold">Directorio activo</h3><span className="text-sm text-slate-500">{count} contacto{count===1?"":"s"}</span></div>
+   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-5 sm:px-6"><h3 className="text-lg font-bold">Directorio activo</h3><div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-500">{totalContacts} contacto{totalContacts===1?"":"s"}</span><DownloadContacts businessId={businessId} disabled={totalContacts===0}/></div></div>
    <div className="divide-y divide-slate-100">{visible.map(c=>{const fullName=[c.nombre,c.apellido].filter(Boolean).join(" ")||c.empresa||"Sin nombre";const initial=fullName.trim().charAt(0).toUpperCase();const phone=c.crm_contacto_medios?.find(m=>m.tipo==="telefono")?.valor;const email=c.crm_contacto_medios?.find(m=>m.tipo==="correo")?.valor;return <div key={c.id} className="flex flex-col gap-4 px-5 py-5 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex min-w-0 items-center gap-4"><div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-lg font-bold text-emerald-800">{initial}</div><div className="min-w-0"><p className="truncate font-semibold text-slate-900">{fullName}</p><p className="truncate text-sm text-slate-500">{c.empresa||"Sin empresa"}</p><p className="break-all text-xs text-slate-600">{phone||"Sin teléfono"} · {email||"Sin correo"}</p></div></div><button type="button" onClick={()=>edit(c)} className="shrink-0 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-emerald-50 sm:self-center">Ver / editar</button></div>;})}{listLoading&&<p className="px-6 py-8 text-sm text-slate-500">Cargando contactos…</p>}{listError&&<div role="alert" className="px-6 py-8 text-sm text-red-700">{listError} <button type="button" onClick={()=>setRevision(v=>v+1)} className="underline">Reintentar</button></div>}{!listLoading&&!listError&&!visible.length&&<p className="px-6 py-8 text-sm text-slate-500">No se encontraron contactos.</p>}</div>
    <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 sm:px-6"><button type="button" disabled={listLoading||currentPage===1} onClick={()=>setPage(p=>Math.max(1,p-1))} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">Anterior</button><span className="text-sm text-slate-500">Página {currentPage} de {totalPages}</span><button type="button" disabled={listLoading||currentPage===totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">Siguiente</button></div>
   </div>
@@ -90,6 +91,10 @@ export default function BusinessContacts({businessId,onSaved}:{businessId:string
     {selected&&!editMode&&!readOnly&&<div className="mb-4 flex justify-end"><button type="button" onClick={()=>setEditMode(true)} className="rounded-xl border px-4 py-2 text-sm font-semibold">Editar datos</button></div>}
     <form id="crm-contact-form" onSubmit={save} className="grid gap-3 sm:grid-cols-2">
     {([["nombre","Nombre",120],["apellido","Apellido",120],["empresa","Empresa",180],["correo","Correo",320],["telefono","Teléfono",25],["direccion","Dirección",2000]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-medium">{label}<input disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} maxLength={max} value={form[key]} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))}/></label>)}
+    <label className="block text-sm font-medium">Fuente<select className={field+" disabled:bg-slate-50"} value={form.fuente} disabled={saving||readOnly||!!selected&&!editMode} onChange={e=>setForm(v=>({...v,fuente:e.target.value}))}>
+      <option value="">Sin especificar</option>
+      {sources.map(source=><option key={source} value={source}>{source}</option>)}
+    </select></label>
     <label className="block text-sm font-medium sm:col-span-2">Notas<textarea disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} rows={3} maxLength={4000} value={form.notas} onChange={e=>setForm(v=>({...v,notas:e.target.value}))}/></label>
     </form>
    </div>}

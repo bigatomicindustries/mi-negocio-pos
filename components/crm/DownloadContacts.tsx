@@ -9,18 +9,18 @@ function csvCell(value: string | null) {
   return '"' + safe.replaceAll('"', '""') + '"';
 }
 
-export default function DownloadContacts({ businessId }: { businessId: string }) {
+export default function DownloadContacts({ businessId, disabled }: { businessId: string; disabled: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function download() {
     setBusy(true);
     setError("");
     try {
-      const csv = ["Nombre,Apellido,Empresa,Dirección,Notas,Correos,Teléfonos"];
+      const csv = ["Nombre,Apellido,Empresa,Dirección,Notas,Correos,Teléfonos,Fuente"];
       let lastId = "";
       for (;;) {
         let query = supabase.from("crm_contactos")
-          .select("id,nombre,apellido,empresa,direccion,notas,crm_contacto_medios(tipo,valor)")
+          .select("id,nombre,apellido,empresa,direccion,notas,fuente,crm_contacto_medios(tipo,valor)")
           .eq("business_id", businessId).eq("ambito", "negocio").is("archivado_at", null)
           .order("id").limit(250);
         if (lastId) query = query.gt("id", lastId);
@@ -28,7 +28,7 @@ export default function DownloadContacts({ businessId }: { businessId: string })
         if (error) throw error;
         for (const row of data) {
           const media = (type: string) => row.crm_contacto_medios.filter(m => m.tipo === type).map(m => m.valor).join(" | ");
-          csv.push([row.nombre,row.apellido,row.empresa,row.direccion,row.notas,media("correo"),media("telefono")].map(csvCell).join(","));
+          csv.push([row.nombre,row.apellido,row.empresa,row.direccion,row.notas,media("correo"),media("telefono"),row.fuente].map(csvCell).join(","));
         }
         if (data.length < 250) break;
         lastId = data[data.length-1].id;
@@ -43,5 +43,5 @@ export default function DownloadContacts({ businessId }: { businessId: string })
       setError("No se pudo descargar el directorio. Inténtalo de nuevo.");
     } finally { setBusy(false); }
   }
-  return <div><button type="button" disabled={busy} onClick={download} className="rounded-xl border px-4 py-2 font-semibold">{busy ? "Preparando archivo…" : "Descargar contactos CSV"}</button>{error && <p role="alert">{error}</p>}</div>;
+  return <div><button type="button" disabled={busy || disabled} onClick={download} className="rounded-xl border px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">{busy ? "Preparando archivo…" : "Descargar contactos CSV"}</button>{error && <p role="alert">{error}</p>}</div>;
 }
