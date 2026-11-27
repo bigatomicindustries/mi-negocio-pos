@@ -71,8 +71,8 @@ function PersonalBudget({ owner }: { owner: string }) {
   const data = result?.key === key ? result.data : null;
   const totals = summarize(data?.entries ?? []);
   const history = data?.entries.filter(entry => filter === "Todos" || entry.kind === filter);
-  const periodFilters = (<div className="filters"><div className="choices">{periods.map(item => <button key={item} aria-pressed={item === period} onClick={() => setPeriod(item)}>{item}</button>)}</div>
-            <label>Fecha de referencia<input type="date" value={day} onChange={e => { if (e.target.value && e.target.validity.valid) setDay(e.target.value); }} /></label></div>);
+  const periodControls = (<><div className="choices">{periods.map(item => <button key={item} aria-pressed={item === period} onClick={() => setPeriod(item)}>{item}</button>)}</div>
+            <label>Fecha de referencia<input type="date" value={day} onChange={e => { if (e.target.value && e.target.validity.valid) setDay(e.target.value); }} /></label></>);
   const loadStatus = result?.key === key
     ? <p role="alert">No se pudo cargar tu presupuesto. <button onClick={refresh}>Reintentar</button></p>
     : <p role="status">Cargando presupuesto…</p>;
@@ -89,7 +89,7 @@ function PersonalBudget({ owner }: { owner: string }) {
     <div className="layout" hidden={view !== "Inicio"}>
       <aside><MovementForm owner={owner} goals={result?.data?.goals ?? []} onSave={refresh} /></aside>
         <section className="panel"><h2>Resumen del periodo</h2>
-          {periodFilters}
+          <div className="filters">{periodControls}</div>
           {data ? <>
             <div className="metrics">{[["Ingresos", totals.income], ["Gastos", totals.expense], ["Ahorro apartado", totals.savings], ["Disponible del periodo", totals.available]].map(([label, value]) =>
               <div key={label}><small>{label}</small><strong>{money(Number(value))}</strong></div>)}</div>
@@ -113,9 +113,11 @@ function PersonalBudget({ owner }: { owner: string }) {
             <button className="primary" disabled={goalBusy}>{goalBusy ? "Guardando…" : "Crear meta"}</button></form></details><p role="status">{goalNotice}</p>
         </section>
     <section className="panel" hidden={view !== "Historial"}><h2>Historial de movimientos</h2>
-          {periodFilters}
+          <div className="history-filters">
+            <div className="choices">{(["Todos", ...kinds] as const).map(item => <button key={item} aria-pressed={item === filter} onClick={() => setFilter(item)}>{item}</button>)}</div>
+            {periodControls}
+          </div>
           {!data && loadStatus}
-          <div className="choices">{(["Todos", ...kinds] as const).map(item => <button key={item} aria-pressed={item === filter} onClick={() => setFilter(item)}>{item}</button>)}</div>
           {history?.length === 0 && <p>Sin movimientos para este filtro.</p>}
           {history?.map(entry => <div className="row entry" key={entry.id}><div><b>{entry.concept || (entry.kind === "Gasto" ? entry.category : entry.kind)}</b>
             <small>{entry.kind} · {entry.kind === "Ahorro" ? data?.goals.find(g => g.id === entry.goal_id)?.name || "Ahorro general" : entry.category} · {entry.method}</small>
