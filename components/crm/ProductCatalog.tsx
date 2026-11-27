@@ -14,6 +14,12 @@ const btn="rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-50
 const primary="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
 const money=(n:number)=>n.toLocaleString("es-MX",{style:"currency",currency:"MXN"});
 const validPrice = (value:string) => /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(value) && Number(value) <= 999999999999.99;
+function groupPrice(value:string){
+ const [whole,fraction]=value.split(".");
+ const grouped=whole.replace(/\B(?=(\d{3})+(?!\d))/g,",");
+ return fraction===undefined?grouped:grouped+"."+fraction;
+}
+
 export const catalogTotal=(lines:CatalogLine[])=>lines.reduce((sum,l)=>sum+Math.round(Number(l.precio)*100)*l.cantidad,0)/100;
 
 function useCatalog(businessId:string){
@@ -39,7 +45,10 @@ function useCatalog(businessId:string){
   load().catch(()=>{if(current)setError("No se pudo cargar el catálogo.");}).finally(()=>{if(current)setBusy(false);});
   return ()=>{current=false;};
  },[businessId,revision]);
- return {items,busy,error,reload:()=>setRevision(v=>v+1)};
+ function addItem(item:Item){
+  setItems(previous=>[...previous.filter(row=>row.id!==item.id),item].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")));
+ }
+ return {items,busy,error,addItem,reload:()=>setRevision(v=>v+1)};
 }
 
 export function OpportunityEstimate({businessId,lines,setLines,amount,setAmount,disabled,original=[]}:{
@@ -72,9 +81,16 @@ export function OpportunityEstimate({businessId,lines,setLines,amount,setAmount,
 }
 
 export default function ProductCatalog({businessId,readOnly}:{businessId:string;readOnly:boolean}){
- const {items,busy,error,reload}=useCatalog(businessId);
+ const {items,busy,error,addItem,reload}=useCatalog(businessId);
  const [query,setQuery]=useState(""),[category,setCategory]=useState(""),[status,setStatus]=useState(""),[archived,setArchived]=useState(false),[page,setPage]=useState(1);
  const [sortOrder,setSortOrder]=useState("name");
+ const [highlightId,setHighlightId]=useState<string|null>(null);
+ const [creating,setCreating]=useState(false);
+ useEffect(()=>{
+  if(!highlightId)return;
+  const timer=window.setTimeout(()=>setHighlightId(null),4000);
+  return ()=>window.clearTimeout(timer);
+ },[highlightId]);
  const [editingPrice,setEditingPrice]=useState(false);
  const [opened,setOpened]=useState(false),[editing,setEditing]=useState<Item|null>(null),[draft,setDraft]=useState<Draft>(empty);
  const [fields,setFields]=useState<{name:string;value:string}[]>([]),[saving,setSaving]=useState(false),[problem,setProblem]=useState("");
@@ -83,6 +99,12 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
  const search=query.trim().toLocaleLowerCase("es");
  const filtered=items.filter(i=>i.activo!==archived&&(!category||category===i.categoria)&&(!status||status===i.disponibilidad)&&[i.nombre,i.sku,i.categoria].some(v=>v.toLocaleLowerCase("es").includes(search)));
  if(sortOrder==="price")filtered.sort((a,b)=>a.precio-b.precio);
+ const highlighted=items.find(item=>item.id===highlightId);
+ if(highlighted){
+  const index=filtered.findIndex(item=>item.id===highlightId);
+  if(index>=0)filtered.splice(index,1);
+  filtered.unshift(highlighted);
+ }
  const pages=Math.max(1,Math.ceil(filtered.length/24)),current=Math.min(page,pages);
  const [photo,setPhoto]=useState<File|null>(null),[urls,setUrls]=useState<Record<string,string>>({});
  const visibleItems=filtered.slice((current-1)*24,current*24);
@@ -102,6 +124,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
   return ()=>{live=false;clearInterval(timer);};
  },[paths,items]);
  function open(item:Item|null){
+  setCreating(item===null);
   setEditingPrice(false);
   setPhoto(null);setEditing(item);setDraft(item?{...item,precio:String(item.precio)}:{...empty});setFields(Object.entries(item?.campos||{}).map(([name,value])=>({name,value})));setProblem("");setOpened(true);
  }
@@ -128,7 +151,12 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
      if(uploaded.error)throw uploaded.error;
     }catch{setProblem("La ficha se guardó. Vuelve a intentar guardar la foto.");reload();return;}
    }
-   setOpened(false);reload();
+   if(creating){
+    addItem({...data,...r.data});
+    setPage(1);
+    setHighlightId(r.data.id);
+   }else reload();
+   setOpened(false);
   }catch{setProblem("No se pudo confirmar el guardado. Revisa el catálogo antes de reintentar.");}finally{setSaving(false);}
  }
  async function removeItem(){
@@ -170,7 +198,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    </div>
   </div>
   {busy?<p>Cargando catálogo…</p>:error?<p role="alert">{error} <button onClick={reload}>Reintentar</button></p>:!filtered.length?<p className="py-6 text-sm text-slate-600">{items.length?"Sin coincidencias.":"Todavía no hay productos ni servicios en el catálogo."}</p>:
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleItems.map(i=><button key={i.id} type="button" onClick={()=>open(i)} className="min-w-0 rounded-xl border p-4 text-left hover:border-emerald-600">
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleItems.map(i=><button key={i.id} type="button" onClick={()=>open(i)} className={"min-w-0 rounded-xl border p-4 text-left transition-colors hover:border-emerald-600 "+(i.id===highlightId?"bg-emerald-50 border-emerald-200":"")}>
     {urls[businessId+"/"+i.id]&&<img loading="lazy" src={urls[businessId+"/"+i.id]} alt={i.nombre} className="mb-3 h-36 w-full rounded-lg object-contain"/>}
     <span className="text-xs text-slate-600">{[i.tipo,i.categoria].filter(Boolean).join(" · ")}</span><strong className="my-1 block break-words">{i.nombre}</strong>{i.sku&&<span className="block text-xs">SKU {i.sku}</span>}
     <span className="mt-3 block font-semibold">{money(i.precio)}</span><span className="text-sm text-slate-600">{i.disponibilidad}</span>
@@ -182,11 +210,22 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
     <label>Nombre<input className={field} required maxLength={240} value={draft.nombre} onChange={e=>update("nombre",e.target.value)}/></label>
     <label>Precio unitario (MXN)
      <input className={field} required type="text" inputMode="decimal" placeholder="$0.00"
-      value={!editingPrice&&validPrice(draft.precio)?money(Number(draft.precio)):draft.precio}
+      value={!editingPrice&&validPrice(draft.precio)?money(Number(draft.precio)):groupPrice(draft.precio)}
       onFocus={()=>setEditingPrice(true)} onBlur={()=>setEditingPrice(false)}
       onChange={e=>{
-       const value=e.target.value.trim().replace(/^\$\s*/, "");
-       update("precio", /^\d{1,3}(,\d{3})+(\.\d*)?$/.test(value)?value.replace(/,/g,""):value);
+       const input=e.currentTarget;
+       const raw=input.value.trim().replace(/^\$\s*/,"").replace(/,/g,"");
+       if(!/^\d*(?:\.\d{0,2})?$/.test(raw))return;
+       const offset=input.value.slice(0,input.selectionStart??input.value.length).replace(/[$,\s]/g,"").length;
+       const formatted=groupPrice(raw);
+       let caret=0, consumed=0;
+       while(caret<formatted.length && consumed<offset){
+        if(formatted[caret]!==",")consumed++;
+        caret++;
+       }
+       input.value=formatted;
+       input.setSelectionRange(caret,caret);
+       update("precio",raw);
       }}/>
     </label>
     {editing&&urls[businessId+"/"+editing.id]&&<img src={urls[businessId+"/"+editing.id]} alt={editing.nombre} className="max-h-64 w-full object-contain sm:col-span-2"/>}
