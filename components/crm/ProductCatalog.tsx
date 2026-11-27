@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {supabase} from "@/lib/supabase";
 import CrmModal from "./CrmModal";
 
@@ -12,6 +12,8 @@ const empty:Draft={nombre:"",tipo:"Producto",precio:"",sku:"",categoria:"",descr
 const field="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-50";
 const btn="rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-50";
 const primary="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
+const pageSize=24;
+const highlightDuration=5000;
 const money=(n:number)=>n.toLocaleString("es-MX",{style:"currency",currency:"MXN"});
 export const catalogTotal=(lines:CatalogLine[])=>lines.reduce((sum,l)=>sum+Math.round(Number(l.precio)*100)*l.cantidad,0)/100;
 
@@ -75,13 +77,32 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
  const [query,setQuery]=useState(""),[category,setCategory]=useState(""),[status,setStatus]=useState(""),[archived,setArchived]=useState(false),[page,setPage]=useState(1);
  const [opened,setOpened]=useState(false),[editing,setEditing]=useState<Item|null>(null),[draft,setDraft]=useState<Draft>(empty);
  const [fields,setFields]=useState<{name:string;value:string}[]>([]),[saving,setSaving]=useState(false),[problem,setProblem]=useState("");
+ const [pendingItemId,setPendingItemId]=useState<string|null>(null);
+ const [highlightedItemId,setHighlightedItemId]=useState<string|null>(null);
+ const highlightedCard=useRef<HTMLButtonElement>(null);
  const categories=[...new Set(items.map(i=>i.categoria).filter(Boolean))].sort();
  const names=[...new Set(items.flatMap(i=>Object.keys(i.campos)))].sort();
  const search=query.trim().toLocaleLowerCase("es");
- const filtered=items.filter(i=>i.activo!==archived&&(!category||category===i.categoria)&&(!status||status===i.disponibilidad)&&[i.nombre,i.sku,i.categoria].some(v=>v.toLocaleLowerCase("es").includes(search)));
- const pages=Math.max(1,Math.ceil(filtered.length/24)),current=Math.min(page,pages);
+ const filtered=items
+  .filter(i=>i.activo!==archived&&(!category||category===i.categoria)&&(!status||status===i.disponibilidad)&&[i.nombre,i.sku,i.categoria].some(v=>v.toLocaleLowerCase("es").includes(search)))
+  .sort((a,b)=>a.precio-b.precio);
+ const pages=Math.max(1,Math.ceil(filtered.length/pageSize)),current=Math.min(page,pages);
  const [photo,setPhoto]=useState<File|null>(null),[urls,setUrls]=useState<Record<string,string>>({});
- const visibleItems=filtered.slice((current-1)*24,current*24);
+ if(pendingItemId&&!opened&&!busy){
+  const index=filtered.findIndex(item=>item.id===pendingItemId);
+  if(index>=0){
+   setPage(Math.floor(index/pageSize)+1);
+   setHighlightedItemId(pendingItemId);
+   setPendingItemId(null);
+  }
+ }
+ useEffect(()=>{
+  if(!highlightedItemId)return;
+  highlightedCard.current?.scrollIntoView({block:"nearest"});
+  const timer=window.setTimeout(()=>setHighlightedItemId(null),highlightDuration);
+  return ()=>window.clearTimeout(timer);
+ },[highlightedItemId]);
+ const visibleItems=filtered.slice((current-1)*pageSize,current*pageSize);
  const paths=visibleItems.map(i=>businessId+"/"+i.id).join(",");
  useEffect(()=>{
   let live=true;
@@ -115,6 +136,14 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    const r=await mutation.select("id,updated_at").maybeSingle();
    if(r.error){setProblem(r.error.code==="23505"?"Ese SKU ya está registrado.":r.error.message);return;}
    if(!r.data){setProblem("El artículo cambió. Cierra la ficha y vuelve a abrirla.");reload();return;}
+   if(!editing){
+    setQuery("");
+    setCategory("");
+    setStatus("");
+    setArchived(false);
+    setPendingItemId(r.data.id);
+    setHighlightedItemId(null);
+   }
    if(photo){
     const savedItem={...data,...r.data};
     setEditing(savedItem);
@@ -161,7 +190,9 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    </div>
   </div>
   {busy?<p>Cargando catálogo…</p>:error?<p role="alert">{error} <button onClick={reload}>Reintentar</button></p>:!filtered.length?<p className="py-6 text-sm text-slate-600">{items.length?"Sin coincidencias.":"Todavía no hay productos ni servicios en el catálogo."}</p>:
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleItems.map(i=><button key={i.id} type="button" onClick={()=>open(i)} className="min-w-0 rounded-xl border p-4 text-left hover:border-emerald-600">
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleItems.map(i=><button key={i.id} type="button" onClick={()=>open(i)}
+    ref={i.id===highlightedItemId?highlightedCard:undefined}
+    className={`min-w-0 rounded-xl border p-4 text-left hover:border-emerald-600 ${i.id===highlightedItemId?"border-emerald-500 bg-emerald-50":"bg-white"}`}>
     {urls[businessId+"/"+i.id]&&<img loading="lazy" src={urls[businessId+"/"+i.id]} alt={i.nombre} className="mb-3 h-36 w-full rounded-lg object-contain"/>}
     <span className="text-xs text-slate-600">{[i.tipo,i.categoria].filter(Boolean).join(" · ")}</span><strong className="my-1 block break-words">{i.nombre}</strong>{i.sku&&<span className="block text-xs">SKU {i.sku}</span>}
     <span className="mt-3 block font-semibold">{money(i.precio)}</span><span className="text-sm text-slate-600">{i.disponibilidad}</span>
