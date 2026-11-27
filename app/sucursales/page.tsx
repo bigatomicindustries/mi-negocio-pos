@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { isBusinessPlan } from "@/lib/branch-plan";
 import { useAuth } from "@/context/AuthContext";
 
 type Suscripcion = {
@@ -230,6 +231,10 @@ if (
   );
 }
 
+if (!isBusinessPlan(suscripcionData[0].plan_slug)) {
+  router.replace("/");
+  return;
+}
 setSuscripcion(suscripcionData[0]);
 
 setSucursalesAdmin(
@@ -275,6 +280,8 @@ setSucursalesAdmin(
       </main>
     );
   }
+
+  if (perfil?.role !== "admin" || !suscripcion) return error ? <p role="alert" className="p-6">{error}</p> : null;
 
   const maxSucursales =
     Number(suscripcion?.max_branches ?? 0);
@@ -379,13 +386,14 @@ setSucursalesAdmin(
     ) : (
       <button
         type="button"
+        disabled={!puedeCrear}
         onClick={() =>
           reactivarSucursal(
             sucursal.id,
             sucursal.name
           )
         }
-        className="rounded-xl border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-50"
+        className="rounded-xl border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-50 disabled:opacity-50"
       >
         Reactivar
       </button>

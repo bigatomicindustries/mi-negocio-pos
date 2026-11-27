@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { isBusinessPlan } from "@/lib/branch-plan";
 import { nombreRol } from "@/lib/roles";
 
 const opciones = [
@@ -131,7 +133,40 @@ useEffect(() => {
     </div>
   );
 
+  const [businessConSucursales, setBusinessConSucursales] = useState<string | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    setBusinessConSucursales(null);
+    if (perfil?.role === "admin" && negocio?.id) {
+      supabase.rpc("get_my_subscription").then(({ data }) => {
+        if (vigente && isBusinessPlan(data?.[0]?.plan_slug)) setBusinessConSucursales(negocio.id);
+      });
+    }
+    return () => { vigente = false; };
+  }, [perfil?.id, perfil?.role, negocio?.id, pathname]);
+
+  const selectorSucursal = sucursalActiva && sucursales.length > 1 ? (
+      <select
+        value={sucursalActiva.id}
+        onChange={(e) =>
+          cambiarSucursal(e.target.value)
+        }
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-green-400"
+        aria-label="Sucursal activa"
+      >
+        {sucursales.map((sucursal) => (
+          <option
+            key={sucursal.id}
+            value={sucursal.id}
+          >
+            {sucursal.name}
+          </option>
+        ))}
+      </select>
+  ) : null;
+
   const opcionesCuenta = [
+    { href: "/sucursales", nombre: "Sucursales", descripcion: "Administra las ubicaciones de tu negocio", visible: perfil?.role === "admin" && !!negocio && businessConSucursales === negocio.id },
     { href: "/usuarios", nombre: "Empleados", descripcion: "Administra usuarios, roles y accesos", visible: perfil?.role === "admin" },
     { href: "/configuracion/pagos", nombre: "Configuración", descripcion: "Pagos y transferencias", visible: puedeAdministrar },
   ].filter(opcion => opcion.visible).map(opcion => (
@@ -460,8 +495,11 @@ className={`text-xs transition-transform duration-200 ${
 
     </div>
   </div>
+  {selectorSucursal && <div className="px-4 pb-2">{selectorSucursal}</div>}
 </div>
-<div className="mx-auto hidden w-full max-w-7xl items-center justify-between gap-6 px-6 py-4 md:flex">        {/* MARCA */}
+<div className="mx-auto hidden w-full max-w-7xl items-center justify-between gap-6 px-6 py-4 md:flex">
+      <div className="flex min-w-0 items-center gap-4">
+        {/* MARCA */}
 
         <Link
           href="/"
@@ -481,23 +519,7 @@ className={`text-xs transition-transform duration-200 ${
     </p>
   ) : sucursalActiva ? (
     sucursales.length > 1 ? (
-      <select
-        value={sucursalActiva.id}
-        onChange={(e) =>
-          cambiarSucursal(e.target.value)
-        }
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-green-400"
-        aria-label="Sucursal activa"
-      >
-        {sucursales.map((sucursal) => (
-          <option
-            key={sucursal.id}
-            value={sucursal.id}
-          >
-            {sucursal.name}
-          </option>
-        ))}
-      </select>
+      selectorSucursal
     ) : (
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
@@ -511,6 +533,8 @@ className={`text-xs transition-transform duration-200 ${
     )
   ) : null}
 </div>
+
+      </div>
 
         {/* NAVEGACIÓN */}
 
