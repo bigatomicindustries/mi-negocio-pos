@@ -50,3 +50,10 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .balance-chart figcaption { font-size:.85rem; }
 .budget .card-form form { max-width:28rem; }
 @media(max-width: 30rem) { .budget .budget-nav button { padding-inline:.25rem; font-size:.8rem; } }
+.budget .goal-history { margin-top:1rem; }
+.budget .goal-action,.budget .movement-detail button[type=button] { color:#126545; font-weight:650; padding:.45rem 0; }
+.budget .movement-detail summary { display:flex; align-items:center; gap:.6rem; color:inherit; }
+.budget .movement-detail summary::before { content:"▸"; color:#126545; }
+.budget .movement-detail[open] summary::before { content:"▾"; }
+.budget .movement-detail summary strong { margin-left:auto; }
+.budget .movement-detail form { margin-top:1rem; max-width:25rem; }
