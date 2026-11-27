@@ -1,4 +1,5 @@
 "use client";
+import {formatFollowUp} from "@/lib/followUpDate";
 import {useEffect,useState} from "react";
 import ContactChannelFields, {type ChannelRow} from "./ContactChannelFields";
 import CrmModal from "./CrmModal";
@@ -9,7 +10,7 @@ import {useBusinessTrial} from "@/app/components/BusinessTrial";
 import {supabase} from "@/lib/supabase";
 type Medio={tipo:"correo"|"telefono";valor:string;etiqueta?:string|null};
 type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;partidas:CatalogLine[];nota_fija:string;updated_at:string;created_at:string};
-type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;completada_at:string|null};
+type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;fecha_sin_hora?:string|null;completada_at:string|null};
 type Tab="resumen"|"datos"|"actividad";
 const money=(n:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
 export type Contact={fuente?:string|null;id:string;nombre:string|null;apellido:string|null;empresa:string|null;direccion:string|null;notas:string|null;updated_at:string;crm_contacto_medios:Medio[]};
@@ -36,15 +37,15 @@ export default function BusinessContacts({businessId,totalContacts,onSaved,userI
  const [linked,setLinked]=useState<Opportunity[]>([]),[linkedTasks,setLinkedTasks]=useState<Task[]>([]),[relationsLoading,setRelationsLoading]=useState(false),[relationsError,setRelationsError]=useState("");
  useEffect(()=>{let cancelled=false;setLinked([]);setLinkedTasks([]);setLogs([]);setRelationsError("");if(!open||!selected||behindDialog||tab==="datos"){setRelationsLoading(false);return;}setRelationsLoading(true);void (async()=>{try{
  const all:Opportunity[]=[];for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,partidas,nota_fija,updated_at,created_at").eq("business_id",businessId).eq("contacto_id",selected.id).order("created_at",{ascending:false}).order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;all.push(...(r.data||[]));if((r.data||[]).length<250)break;}
- const tasks:Task[]=[];for(let i=0;i<all.length;i+=100){for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,completada_at").in("oportunidad_id",all.slice(i,i+100).map(o=>o.id)).order("vence_at").order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;tasks.push(...(r.data||[]));if((r.data||[]).length<250)break;}}
+ const tasks:Task[]=[];for(let i=0;i<all.length;i+=100){for(let offset=0;;offset+=250){const r=await supabase.from("crm_negocio_tareas").select("id,oportunidad_id,titulo,vence_at,fecha_sin_hora,completada_at").in("oportunidad_id",all.slice(i,i+100).map(o=>o.id)).order("vence_at").order("id").range(offset,offset+249);if(cancelled)return;if(r.error)throw r.error;tasks.push(...(r.data||[]));if((r.data||[]).length<250)break;}}
  const history=await readContactActivities(businessId,selected.id);
  if(!cancelled){setLogs(history);setLinked(all);setLinkedTasks(tasks);}
  }catch{if(!cancelled)setRelationsError("No se pudieron cargar las relaciones comerciales. Cierra y vuelve a abrir el contacto.");}finally{if(!cancelled)setRelationsLoading(false);}})();return()=>{cancelled=true;};},[businessId,selected?.id,open,behindDialog,activityRevision,relationRevision,tab]);
  const total=linked.filter(o=>o.etapa!=="perdido").reduce((sum,o)=>sum+Number(o.valor_estimado||0),0);
- function viewTask(task:Task){setDetail({title:task.titulo,date:task.vence_at,text:task.completada_at?"Seguimiento completado":"Seguimiento pendiente",opportunityId:task.oportunidad_id});}
+ function viewTask(task:Task){setDetail({title:task.titulo,date:task.fecha_sin_hora||task.vence_at,text:task.completada_at?"Seguimiento completado":"Seguimiento pendiente",opportunityId:task.oportunidad_id});}
  function viewLog(log:ContactActivityRow){setDetail({title:activityLabel(log.tipo),date:log.created_at,text:log.descripcion,opportunityId:log.oportunidad_id});}
  function activityLabel(tipo:string){return ({llamada:"Llamada",nota:"Nota",mensaje:"Mensaje",reunion:"Reunión",cambio_etapa:"Cambio de etapa"} as Record<string,string>)[tipo]||tipo;}
- const activity=[...logs.map(log=>({id:"a"+log.id,date:log.created_at,label:activityLabel(log.tipo),detail:log.descripcion,show:()=>viewLog(log)})),...linked.map(o=>({id:"o"+o.id,show:()=>onOpenOpportunity(o,selected!),date:o.created_at,label:"Oportunidad creada: "+o.titulo,detail:"Etapa actual: "+o.etapa})),...linkedTasks.map(t=>({id:"t"+t.id,show:()=>viewTask(t),date:t.completada_at||t.vence_at,label:t.completada_at?"Tarea completada: "+t.titulo:"Seguimiento programado: "+t.titulo,detail:t.completada_at?"Completada":"Fecha programada"}))].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
+ const activity=[...logs.map(log=>({id:"a"+log.id,date:log.created_at,label:activityLabel(log.tipo),detail:log.descripcion,show:()=>viewLog(log)})),...linked.map(o=>({id:"o"+o.id,show:()=>onOpenOpportunity(o,selected!),date:o.created_at,label:"Oportunidad creada: "+o.titulo,detail:"Etapa actual: "+o.etapa})),...linkedTasks.map(t=>({id:"t"+t.id,show:()=>viewTask(t),date:t.completada_at||t.fecha_sin_hora||t.vence_at,label:t.completada_at?"Tarea completada: "+t.titulo:"Seguimiento programado: "+t.titulo,detail:t.completada_at?"Completada":"Fecha programada"}))].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
  const [visible,setVisible]=useState<Contact[]>([]),[count,setCount]=useState(0),[listLoading,setListLoading]=useState(true),[listError,setListError]=useState(""),[revision,setRevision]=useState(0);
  const totalPages=Math.max(1,Math.ceil(count/pageSize));
  const currentPage=Math.min(page,totalPages);
@@ -106,13 +107,13 @@ export default function BusinessContacts({businessId,totalContacts,onSaved,userI
     <h4 className="font-semibold">Oportunidades vinculadas</h4>
     <div className="max-h-56 divide-y overflow-y-auto">{linked.map(o=><button type="button" onClick={()=>onOpenOpportunity(o,selected)} key={o.id} className="flex w-full text-left hover:bg-slate-50 items-start justify-between gap-3 py-3 text-sm"><span><strong className="block">{o.titulo}</strong><span className="text-slate-500 capitalize">{o.etapa}</span></span><span className="shrink-0 font-semibold">{money(Number(o.valor_estimado))}</span></button>)}{!linked.length&&<p className="py-3 text-sm text-slate-500">Este contacto todavía no tiene oportunidades.</p>}</div>
     <h4 className="font-semibold">Próximos seguimientos</h4>
-    <div className="max-h-44 divide-y overflow-y-auto">{linkedTasks.filter(t=>!t.completada_at).sort((a,b)=>a.vence_at.localeCompare(b.vence_at)).map(t=><button type="button" onClick={()=>viewTask(t)} key={t.id} className="block w-full py-2 text-left text-sm hover:bg-slate-50">{t.titulo}<span className="block text-xs text-slate-500">{new Date(t.vence_at).toLocaleString("es-MX")}</span></button>)}{!linkedTasks.some(t=>!t.completada_at)&&<p className="py-3 text-sm text-slate-500">Sin tareas pendientes.</p>}</div>
+    <div className="max-h-44 divide-y overflow-y-auto">{linkedTasks.filter(t=>!t.completada_at).sort((a,b)=>a.vence_at.localeCompare(b.vence_at)).map(t=><button type="button" onClick={()=>viewTask(t)} key={t.id} className="block w-full py-2 text-left text-sm hover:bg-slate-50">{t.titulo}<span className="block text-xs text-slate-500">{formatFollowUp(t.vence_at,t.fecha_sin_hora)}</span></button>)}{!linkedTasks.some(t=>!t.completada_at)&&<p className="py-3 text-sm text-slate-500">Sin tareas pendientes.</p>}</div>
     {logs.length>0&&<section><h4 className="font-semibold">Actividades recientes</h4>{logs.slice(0,5).map(log=><button key={log.id} type="button" onClick={()=>viewLog(log)} className="block w-full truncate py-2 text-left text-sm hover:bg-slate-50"><strong>{activityLabel(log.tipo)}</strong> · {log.descripcion}</button>)}</section>}
    </div>}
    {selected&&tab==="actividad"&&<div className="mt-5">
     <div className="flex flex-wrap gap-2"><button type="button" disabled={readOnly} onClick={()=>onCreateOpportunity(selected)} className="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">Registrar oportunidad</button>
     <button type="button" disabled={readOnly} onClick={()=>setRecording(true)} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Registrar actividad</button></div>
-    {!relationsLoading&&!relationsError&&<div className="mt-3 max-h-96 divide-y overflow-y-auto">{activity.map(a=><button type="button" onClick={a.show} key={a.id} className="block w-full py-3 text-left hover:bg-slate-50"><strong className="block text-sm">{a.label}</strong><span className="block truncate text-xs text-slate-500">{a.detail} · {new Date(a.date).toLocaleString("es-MX")}</span></button>)}{!activity.length&&<p className="py-4 text-sm text-slate-500">Aún no hay actividad comercial vinculada.</p>}</div>}
+    {!relationsLoading&&!relationsError&&<div className="mt-3 max-h-96 divide-y overflow-y-auto">{activity.map(a=><button type="button" onClick={a.show} key={a.id} className="block w-full py-3 text-left hover:bg-slate-50"><strong className="block text-sm">{a.label}</strong><span className="block truncate text-xs text-slate-500">{a.detail} · {formatFollowUp(a.date,a.date.length===10?a.date:null)}</span></button>)}{!activity.length&&<p className="py-4 text-sm text-slate-500">Aún no hay actividad comercial vinculada.</p>}</div>}
    </div>}
    {(!selected||tab==="datos")&&<div className="mt-5">
 
@@ -130,7 +131,7 @@ export default function BusinessContacts({businessId,totalContacts,onSaved,userI
   </div></div>}
   {open&&selected&&recording&&<ContactActivityForm businessId={businessId} contactId={selected.id} userId={userId} onClose={()=>setRecording(false)} onSaved={()=>{setRecording(false);setActivityRevision(v=>v+1);}}/>}
   {open&&selected&&detail&&<CrmModal open title={detail.title} onClose={()=>setDetail(null)}>
-    <p className="whitespace-pre-wrap break-words">{detail.text}</p><p className="text-sm text-slate-600">{new Date(detail.date).toLocaleString("es-MX")}</p>
+    <p className="whitespace-pre-wrap break-words">{detail.text}</p><p className="text-sm text-slate-600">{formatFollowUp(detail.date,detail.date.length===10?detail.date:null)}</p>
     {linked.filter(o=>o.id===detail.opportunityId).map(o=><button type="button" key={o.id} className="font-semibold text-emerald-700 underline" onClick={()=>{setDetail(null);onOpenOpportunity(o,selected);}}>{o.titulo}</button>)}
   </CrmModal>}
  </section>;

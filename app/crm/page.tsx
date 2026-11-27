@@ -1,4 +1,5 @@
 "use client";
+import {formatFollowUp,followUpDeadline} from "@/lib/followUpDate";
 import {Suspense,useCallback,useEffect,useRef,useState} from "react";
 import {useAuth} from "@/context/AuthContext";
 import {supabase} from "@/lib/supabase";
@@ -16,7 +17,7 @@ import {useSearchParams} from "next/navigation";
 import Link from "next/link";
 
 type Opportunity={id:string;contacto_id:string;titulo:string;etapa:string;valor_estimado:number;partidas:CatalogLine[];nota_fija:string;updated_at:string;created_at:string};
-type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;completada_at:string|null};
+type Task={id:string;oportunidad_id:string;titulo:string;vence_at:string;fecha_sin_hora?:string|null;completada_at:string|null};
 const stages=["nuevo","contactado","propuesta","negociacion","ganado","perdido"];
 const money=(v:number)=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(v);
 const input="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
@@ -185,21 +186,21 @@ function NegocioCRMContent(){
  }
  async function addTask(e:React.FormEvent){
   e.preventDefault();if(!allowed||saving||!user||!taskOpp)return;
-  const d=new Date(taskDue);if(!taskTitle.trim()||taskTitle.trim().length>240||!taskDue||Number.isNaN(d.getTime())){setError("Indica tarea y fecha válidas.");return;}
+  const d=followUpDeadline(taskDue);if(!taskTitle.trim()||taskTitle.trim().length>240||!taskDue||Number.isNaN(d.getTime())){setError("Indica tarea y fecha válidas.");return;}
   setSaving(true);setError("");setNotice("");
-  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),created_by:user.id}).select("id");
+  try{if(!await verifyAccess())return;const r=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:taskOpp,titulo:taskTitle.trim(),vence_at:d.toISOString(),fecha_sin_hora:taskDue.length===10?taskDue:null,created_by:user.id}).select("id");
   if(r.error)setError("No se pudo crear la tarea: "+r.error.message);
   else if(!r.data?.length)setError("No se confirmó la creación de la tarea. Revisa tus permisos.");else{setTaskTitle("");setTaskDue("");setTaskOpp("");setDialog(null);setNotice("Seguimiento programado.");await load();}
   }catch{setError("No se pudo completar la operación. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}
  }
  async function createOpportunityTask(opportunityId:string,taskName:string,dueLocal:string):Promise<string|null>{
   if(!allowed||saving||!user||!negocio||!opportunityId)return "No tienes permiso para crear este seguimiento.";
-  const due=new Date(dueLocal);
+  const due=followUpDeadline(dueLocal);
   if(!taskName.trim()||taskName.trim().length>240||!dueLocal||Number.isNaN(due.getTime()))return "Indica una tarea y una fecha válidas.";
   setSaving(true);
   try{
    if(!await verifyAccess())return "Tu acceso al CRM ya no está habilitado.";
-   const result=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:opportunityId,titulo:taskName.trim(),vence_at:due.toISOString(),created_by:user.id}).select("id");
+   const result=await supabase.from("crm_negocio_tareas").insert({oportunidad_id:opportunityId,titulo:taskName.trim(),vence_at:due.toISOString(),fecha_sin_hora:dueLocal.length===10?dueLocal:null,created_by:user.id}).select("id");
    if(result.error)return "No se pudo crear el seguimiento: "+result.error.message;
    if(!result.data?.length)return "No se confirmó la creación del seguimiento. Revisa tus permisos.";
    await load();
@@ -231,7 +232,7 @@ function NegocioCRMContent(){
    ].map(item=><Link key={item.label} href={"/crm?seccion="+item.href} className="rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-400 hover:bg-emerald-50/30"><p className="text-sm text-slate-500">{item.label}</p><p className="mt-2 text-3xl font-bold text-slate-900">{item.value}</p><p className="mt-2 text-xs text-slate-500">{item.detail}</p></Link>)}</div>
    <div className="grid gap-6 lg:grid-cols-2">
     <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold">Estado de oportunidades</h3><Link href="/crm?seccion=oportunidades" className="text-sm font-semibold text-emerald-700 hover:underline">Ver pipeline</Link></div><div className="mt-4 space-y-4">{stages.map(stage=>{const count=Number(metrics?.counts[stage]||0);return <div key={stage}><div className="mb-1 flex justify-between text-sm"><span className="capitalize text-slate-600">{stage}</span><span className="font-semibold">{count}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{width:(totalOpps?count/totalOpps*100:0)+"%"}}/></div></div>;})}</div></section>
-    <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-3 flex-wrap"><h3 className="text-lg font-bold">Próximos seguimientos</h3><button type="button" disabled={readOnly} onClick={()=>openDialog("followup")} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Programar seguimiento</button></div><div className="mt-4 divide-y divide-slate-100">{(metrics?.agenda.rows||[]).slice(0,5).map(t=><div key={t.id} className="py-3"><p className="font-semibold text-slate-900">{t.titulo}</p><p className="mt-1 text-sm text-slate-500">{t.oportunidad_titulo}</p><p className={"mt-1 text-xs "+(new Date(t.vence_at).getTime()<Date.now()?"font-semibold text-amber-700":"text-slate-500")}>{new Date(t.vence_at).toLocaleString("es-MX",{dateStyle:"medium",timeStyle:"short"})}{new Date(t.vence_at).getTime()<Date.now()?" · Vencida":""}</p></div>)}{metrics&&!metrics.agenda.counts.pendientes&&<p className="py-4 text-sm text-slate-500">No hay tareas pendientes.</p>}</div></section>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-3 flex-wrap"><h3 className="text-lg font-bold">Próximos seguimientos</h3><button type="button" disabled={readOnly} onClick={()=>openDialog("followup")} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Programar seguimiento</button></div><div className="mt-4 divide-y divide-slate-100">{(metrics?.agenda.rows||[]).slice(0,5).map(t=><div key={t.id} className="py-3"><p className="font-semibold text-slate-900">{t.titulo}</p><p className="mt-1 text-sm text-slate-500">{t.oportunidad_titulo}</p><p className={"mt-1 text-xs "+(new Date(t.vence_at).getTime()<Date.now()?"font-semibold text-amber-700":"text-slate-500")}>{formatFollowUp(t.vence_at,t.fecha_sin_hora)}{new Date(t.vence_at).getTime()<Date.now()?" · Vencida":""}</p></div>)}{metrics&&!metrics.agenda.counts.pendientes&&<p className="py-4 text-sm text-slate-500">No hay tareas pendientes.</p>}</div></section>
    </div>
    {(filter||requested==="trabajo")&&<div id="agenda" className="scroll-mt-24"><FollowUpAgenda businessId={negocio!.id} revision={agendaRevision} initialFilter={filter} saving={saving||readOnly} onToggle={t=>void toggleTask(t)}/></div>}
    <CrmModal open={dialog==="followup"} title="Programar seguimiento" description="Crea una tarea vinculada a una oportunidad." onClose={()=>setDialog(null)} busy={saving} alert={error}>
@@ -291,7 +292,7 @@ function NegocioCRMContent(){
     <textarea value={editNote} onChange={e=>setEditNote(e.target.value)} disabled={saving||readOnly} rows={4} placeholder="Escribe una nota sobre esta oportunidad" className="min-h-24 flex-1 resize-y rounded-xl border bg-white p-3 text-sm"/>
    </label>
   </div><OpportunityEstimate businessId={negocio!.id} lines={editLines} original={editing.partidas} setLines={setEditLines} amount={editAmount} setAmount={setEditAmount} disabled={saving||readOnly}/></form>
-  <BusinessOpportunityActivities key={editing.id} businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}>
+  <BusinessOpportunityActivities revision={agendaRevision} key={editing.id} businessId={negocio!.id} opportunityId={editing.id} userId={user!.id}>
    <OpportunityCommercialOverview key={editing.id} opportunityId={editing.id} revision={agendaRevision} busy={saving} onToggle={t=>void toggleTask(t)} onCreate={(title,due)=>createOpportunityTask(editing.id,title,due)}/>
   </BusinessOpportunityActivities>
   <p className="mt-4 text-xs text-slate-500">Los cambios solo afectan oportunidades de tu negocio.</p></div></div>}
