@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import CardsPanel from "./CardsPanel";
 import MovementForm from "./MovementForm";
 import { kinds, localDate, money, periodBounds, periods, summarize, type Kind, type Period, type Summary } from "./budget";
 import "./budget.css";
 
-const views = ["Inicio", "Metas", "Historial"] as const;
+const views = ["Inicio", "Metas", "Tarjetas", "Historial"] as const;
 
 function PersonalBudget({ owner }: { owner: string }) {
   const [view, setView] = useState<typeof views[number]>("Inicio");
@@ -87,7 +88,7 @@ function PersonalBudget({ owner }: { owner: string }) {
       </nav>
     </div>
     <div className="layout" hidden={view !== "Inicio"}>
-      <aside><MovementForm owner={owner} goals={result?.data?.goals ?? []} onSave={refresh} /></aside>
+      <aside><MovementForm cards={result?.data?.cards ?? []} owner={owner} goals={result?.data?.goals ?? []} onSave={refresh} /></aside>
         <section className="panel"><h2>Resumen del periodo</h2>
           <div className="filters">{periodControls}</div>
           {data ? <>
@@ -112,6 +113,9 @@ function PersonalBudget({ owner }: { owner: string }) {
             <label>Importe objetivo (MXN)<input type="number" name="target" required step="0.01" min="0.01" max="999999999999.99" inputMode="decimal" /></label>
             <button className="primary" disabled={goalBusy}>{goalBusy ? "Guardando…" : "Crear meta"}</button></form></details><p role="status">{goalNotice}</p>
         </section>
+    <section className="panel" hidden={view !== "Tarjetas"}><h2>Mis tarjetas</h2>
+      {data ? <CardsPanel owner={owner} cards={data.cards} onSave={refresh} /> : loadStatus}
+    </section>
     <section className="panel" hidden={view !== "Historial"}><h2>Historial de movimientos</h2>
           <div className="history-filters">
             <div className="choices">{(["Todos", ...kinds] as const).map(item => <button key={item} aria-pressed={item === filter} onClick={() => setFilter(item)}>{item}</button>)}</div>
@@ -120,7 +124,7 @@ function PersonalBudget({ owner }: { owner: string }) {
           {!data && loadStatus}
           {history?.length === 0 && <p>Sin movimientos para este filtro.</p>}
           {history?.map(entry => <div className="row entry" key={entry.id}><div><b>{entry.concept || (entry.kind === "Gasto" ? entry.category : entry.kind)}</b>
-            <small>{entry.kind} · {entry.kind === "Ahorro" ? data?.goals.find(g => g.id === entry.goal_id)?.name || "Ahorro general" : entry.category} · {entry.method}</small>
+            <small>{entry.kind} · {entry.kind === "Ahorro" ? data?.goals.find(g => g.id === entry.goal_id)?.name || "Ahorro general" : entry.category} · {entry.method}{entry.card_id && " · " + (data?.cards.find(card => card.id === entry.card_id)?.name ?? "Tarjeta registrada")}</small>
             <small>{new Date(entry.occurred_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</small></div>
             <strong data-kind={entry.kind}>{entry.kind === "Gasto" ? "−" : "+"}{money(entry.amount)}</strong></div>)}</section>
   </main>;

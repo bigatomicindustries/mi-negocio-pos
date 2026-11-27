@@ -21,9 +21,10 @@ export function periodBounds(day: string, period: Period) {
   return { period_start: start.toISOString(), period_end: end.toISOString() };
 }
 
-export type Entry = { id: string; kind: Kind; amount: number; category: string; occurred_at: string; concept: string; method: string; goal_id: string | null };
+export type Entry = { id: string; kind: Kind; amount: number; category: string; occurred_at: string; concept: string; method: string; card_id: string | null; goal_id: string | null };
 export type Goal = { id: string; name: string; target: number; saved: number };
-export type Summary = { entries: Entry[]; goals: Goal[]; general: number };
+export type Card = { id: string; name: string; card_type: "Crédito" | "Débito"; cutoff_day: number | null; opening_available: number; available: number; balances: number[] };
+export type Summary = { cards: Card[]; entries: Entry[]; goals: Goal[]; general: number };
 
 export function summarize(entries: Entry[]) {
   const totals = { Gasto: 0, Ingreso: 0, Ahorro: 0 };
