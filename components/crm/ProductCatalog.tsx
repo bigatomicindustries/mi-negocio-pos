@@ -150,12 +150,15 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
   }
  }
  return <section className="space-y-4 rounded-2xl border bg-white p-5">
-  <header className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Catálogo de productos y servicios</h2><button disabled={readOnly} className={primary} onClick={()=>open(null)}>+ Nuevo producto o servicio</button></header>
+  <h2 className="text-xl font-bold">Catálogo de productos y servicios</h2>
   <div className="flex flex-wrap items-center gap-2">
-   <input type="search" aria-label="Buscar en el catálogo" placeholder="Buscar por nombre, SKU o categoría" className={field+" min-w-48 flex-1"} value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
+   <input type="search" aria-label="Buscar en el catálogo" placeholder="Buscar por nombre, SKU o categoría" className="min-w-0 grow basis-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
    <select aria-label="Categoría" className={btn} value={category} onChange={e=>{setCategory(e.target.value);setPage(1);}}><option value="">Todas las categorías</option>{categories.map(c=><option key={c}>{c}</option>)}</select>
    <select aria-label="Disponibilidad" className={btn} value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">Toda disponibilidad</option>{availability.map(a=><option key={a}>{a}</option>)}</select>
-   <label className="text-sm"><input type="checkbox" checked={archived} onChange={e=>{setArchived(e.target.checked);setPage(1);}}/> Archivados</label>
+   <div className="flex max-w-full flex-wrap items-center gap-2">
+    <label className="text-sm"><input type="checkbox" checked={archived} onChange={e=>{setArchived(e.target.checked);setPage(1);}}/> Archivados</label>
+    <button type="button" disabled={readOnly} className={primary} onClick={()=>open(null)}>+ Nuevo producto o servicio</button>
+   </div>
   </div>
   {busy?<p>Cargando catálogo…</p>:error?<p role="alert">{error} <button onClick={reload}>Reintentar</button></p>:!filtered.length?<p className="py-6 text-sm text-slate-600">{items.length?"Sin coincidencias.":"Todavía no hay productos ni servicios en el catálogo."}</p>:
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visibleItems.map(i=><button key={i.id} type="button" onClick={()=>open(i)} className="min-w-0 rounded-xl border p-4 text-left hover:border-emerald-600">
