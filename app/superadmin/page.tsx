@@ -149,8 +149,7 @@ console.error(
           </div>
           {esPlatformAdmin && (
             <nav aria-label="Accesos comerciales" className="flex flex-wrap items-center gap-3">
-              <Link href="/superadmin/tablero" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-800">CRM →</Link>
-              <Link href="/superadmin/contactos" className="rounded-xl border border-green-700 bg-white px-5 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50">Contactos →</Link>
+              <Link href="/superadmin/tablero" className="rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-800">CRM</Link>
             </nav>
           )}
         </div>

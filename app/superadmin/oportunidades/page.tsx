@@ -101,16 +101,6 @@ export default function OportunidadesPage(){
  if(cargando||!esPlatformAdmin)return <main className="p-8 text-slate-600">Verificando acceso…</main>;
  return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
   <div className="mx-auto max-w-7xl space-y-8">
-   <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
-    <Link href="/superadmin" className="text-slate-600 hover:text-emerald-700">← Administración</Link>
-    <div className="flex flex-wrap items-center justify-center gap-3">
-     <Link href="/superadmin/tablero" className="px-2 py-2 text-emerald-700">CRM</Link>
-     <Link href="/superadmin/prospectos" className="px-2 py-2 text-emerald-700">Prospectos</Link>
-     <Link href="/superadmin/centro-trabajo" className="px-2 py-2 text-emerald-700">Centro de trabajo</Link>
-     <Link href="/superadmin/contactos" className="px-2 py-2 text-emerald-700">Contactos</Link>
-     <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">Oportunidades</span>
-    </div><div aria-hidden="true" className="hidden md:block"/>
-   </nav>
    {error&&<div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</div>}
    {notice&&<div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-800">{notice}</div>}
    {filterContactId&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><p><strong>Filtro por contacto:</strong> {contactName(filterContactId)} · {rows.filter(x=>x.contacto_id===filterContactId).length} oportunidades</p><button type="button" className="rounded-lg border border-emerald-300 bg-white px-3 py-2 font-semibold hover:bg-emerald-100" onClick={()=>{setFilterContactId("");window.history.replaceState(null,"",window.location.pathname);}}>Ver todas las oportunidades</button></div>}

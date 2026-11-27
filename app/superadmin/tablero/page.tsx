@@ -423,17 +423,6 @@ export default function TableroComercialPage() {
   return (
     <main className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-7">
-        <nav aria-label="Navegación comercial" className="grid gap-3 text-sm font-semibold md:grid-cols-[1fr_auto_1fr] md:items-center">
-          <Link href="/superadmin" className="text-slate-600 transition hover:text-emerald-700">← Administración</Link>
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-5">
-            <span aria-current="page" className="rounded-lg bg-emerald-700 px-3 py-2 text-white">CRM</span>
-            <Link href="/superadmin/oportunidades" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Oportunidades</Link>
-            <Link href="/superadmin/prospectos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Prospectos</Link>
-            <Link href="/superadmin/centro-trabajo" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Centro de trabajo</Link>
-            <Link href="/superadmin/contactos" className="rounded-lg px-2 py-2 text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900">Contactos</Link>
-          </div>
-          <div aria-hidden="true" className="hidden md:block" />
-        </nav>
 
         <header className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 sm:px-9 sm:py-10">
           <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full border border-emerald-400/20 bg-emerald-400/10 blur-2xl" />
