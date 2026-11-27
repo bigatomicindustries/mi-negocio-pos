@@ -1,0 +1,30 @@
+.budget { max-width: 76rem; margin: auto; padding: clamp(1rem,3vw,2.5rem); color: #172438; }
+.budget h1 { font-size: clamp(1.8rem,4vw,2.6rem); font-weight: 750; letter-spacing: -.04em; }
+.budget .subtitle, .budget small { color: #526478; }
+.budget .layout,.budget .stack { display:grid; gap:1rem; align-items:start; }
+.budget .layout { margin-top:1.5rem; }
+@media(min-width: 820px) { .budget .layout { grid-template-columns:minmax(17rem,1fr) minmax(0,1.8fr); } }
+.budget .panel { border:1px solid #dce3e9; background:white; border-radius:1rem; padding:clamp(1rem,2vw,1.5rem); }
+.budget h2 { font-size:1.2rem; font-weight:700; margin-bottom:1rem; }
+.budget h3 { font-weight:700; margin:1.4rem 0 .6rem; }
+.budget label { display:grid; gap:.25rem; font-size:.85rem; font-weight:600; margin:.75rem 0; }
+.budget input,.budget select { width:100%; min-width:0; background:white; border:1px solid #b5c3cf; font:inherit; padding:.65rem; border-radius:.6rem; }
+.budget .choices { display:flex; flex-wrap:wrap; gap:.3rem; }
+.budget button,.budget summary { cursor:pointer; }
+.budget .choices button { border-radius:.6rem; background:#f0f4f7; padding:.55rem .8rem; font-size:.875rem; }
+.budget .choices [aria-pressed=true] { background:#154c3d; color:white; }
+.budget .primary { width:100%; border-radius:.65rem; background:#126545; color:white; font-weight:650; padding:.7rem; }
+.budget details { padding:.75rem 0; font-size:.9rem; }
+.budget summary { color:#165d49; font-weight:600; }
+.budget .metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+.budget .metrics > div { background:#f4f7f8; border-radius:.7rem; padding:.8rem; }
+.budget small,.budget .metrics strong { display:block; }
+.budget .metrics strong { font-size:clamp(1rem,2vw,1.45rem); overflow-wrap:anywhere; }
+.budget .row,.budget .filters { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; }
+.budget .category,.budget .entry { margin-top:.75rem; }
+.budget progress { display:block; width:100%; height:.5rem; accent-color:#17825e; margin:.35rem 0; }
+.budget .entry { padding-top:.7rem; border-top:1px solid #e1e7eb; overflow-wrap:anywhere; }
+.budget [data-kind=Gasto] { color:#aa383a; }
+.budget [data-kind=Ingreso] { color:#16674b; }
+.budget [data-kind=Ahorro] { color:#1b5ba3; }
+.budget [role=status]:not(:empty) { margin-top:.55rem; font-size:.875rem; }
