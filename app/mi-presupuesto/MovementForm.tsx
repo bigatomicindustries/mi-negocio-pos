@@ -42,17 +42,19 @@ export default function MovementForm({ goals, owner, onSave }: { goals: Goal[]; 
   return <section className="panel"><h2>Nuevo movimiento</h2>
     <form onSubmit={save}>
       <fieldset disabled={busy}>
-        <div className="choices">{kinds.map(item => <button key={item} type="button" aria-pressed={kind === item} onClick={() => { setKind(item); setNotice(""); }}>{item}</button>)}</div>
+        <div className="movement-actions">
+          <div className="choices">{kinds.map(item => <button key={item} type="button" aria-pressed={kind === item} onClick={() => { setKind(item); setNotice(""); }}>{item}</button>)}</div>
+          <button className="primary" type="submit">{busy ? "Guardando…" : "Guardar"}</button>
+        </div>
         <label>Importe (MXN)<input ref={amountRef} name="amount" type="number" inputMode="decimal" min="0.01" max="999999999999.99" step="0.01" required placeholder="0.00" /></label>
+        <label>Concepto (opcional)<input name="concept" maxLength={160} placeholder={kind === "Gasto" ? "¿Qué compraste?" : "Descripción breve"} /></label>
         {kind === "Gasto" && <label>Categoría<select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(name => <option key={name}>{name}</option>)}</select></label>}
         {kind === "Ahorro" && <label>Destino del ahorro<select name="goal"><option value="">Ahorro general</option>{goals.map(goal => <option value={goal.id} key={goal.id}>{goal.name}</option>)}</select></label>}
-        <label>Concepto (opcional)<input name="concept" maxLength={160} placeholder={kind === "Gasto" ? "¿Qué compraste?" : "Descripción breve"} /></label>
         <details><summary>Método de pago y fecha</summary>
           <label>Método de pago<select name="method"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select></label>
           <label>Fecha y hora<input type="datetime-local" name="date" onFocus={e => { if (!e.target.value) e.target.value = localDate(new Date()); }} /></label>
           <small>Si dejas la fecha vacía se usa la hora del registro.</small>
         </details>
-        <button className="primary">{busy ? "Guardando…" : "Guardar " + kind.toLowerCase()}</button>
       </fieldset>
       <p role="status">{notice}</p>
     </form>
