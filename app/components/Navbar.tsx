@@ -112,7 +112,8 @@ useEffect(() => {
     router.refresh();
   }
 
-  const primerNombre =
+  const nombreCuenta = esPlatformAdmin ? "Administración SaaS" : perfil?.full_name;
+  const primerNombre = esPlatformAdmin ? nombreCuenta :
   perfil?.full_name?.trim().split(/\s+/)[0] || "Cuenta";
 
   const opcionesCuenta = [
@@ -378,11 +379,12 @@ className={`text-xs transition-transform duration-200 ${
               );
               setMostrarMas(false);
             }}
+            aria-label={nombreCuenta}
             className="flex h-11 max-w-[135px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition active:bg-slate-100"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-              {perfil.full_name
-                .charAt(0)
+              {nombreCuenta
+                ?.charAt(0)
                 .toUpperCase()}
             </div>
 
@@ -407,12 +409,12 @@ className={`text-xs transition-transform duration-200 ${
 
               <div className="border-b border-slate-100 px-4 py-3">
                 <p className="font-semibold text-slate-900">
-                  {perfil.full_name}
+                  {nombreCuenta}
                 </p>
 
-                <p className="mt-1 text-xs text-slate-500">
+                {!esPlatformAdmin && <p className="mt-1 text-xs text-slate-500">
                   {nombreRol(perfil.role)}
-                </p>
+                </p>}
               </div>
 
 
@@ -671,19 +673,19 @@ onClick={() => {
                 className="flex items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100 font-bold text-green-700">
-                  {perfil.full_name
-                    .charAt(0)
+                  {nombreCuenta
+                    ?.charAt(0)
                     .toUpperCase()}
                 </div>
 
                 <div className="hidden lg:block">
                   <p className="text-sm font-semibold text-slate-900">
-                    {perfil.full_name}
+                    {nombreCuenta}
                   </p>
 
-                  <p className="text-xs text-slate-500">
+                  {!esPlatformAdmin && <p className="text-xs text-slate-500">
                     {nombreRol(perfil.role)}
-                  </p>
+                  </p>}
                 </div>
 
                 <span className="text-xs text-slate-400">
@@ -695,12 +697,12 @@ onClick={() => {
 <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border bg-white p-2 shadow-xl">
                   <div className="border-b px-4 py-3">
                     <p className="font-semibold text-slate-900">
-                      {perfil.full_name}
+                      {nombreCuenta}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">
+                    {!esPlatformAdmin && <p className="mt-1 text-xs text-slate-500">
                       {nombreRol(perfil.role)}
-                    </p>
+                    </p>}
                   </div>
 
                   {opcionesCuenta}

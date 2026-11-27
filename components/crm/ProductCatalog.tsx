@@ -126,6 +126,29 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    setOpened(false);reload();
   }catch{setProblem("No se pudo confirmar el guardado. Revisa el catálogo antes de reintentar.");}finally{setSaving(false);}
  }
+ async function removeItem(){
+  if (!editing || readOnly || saving) return;
+  if (!window.confirm("¿Eliminar «"+editing.nombre+"» del catálogo?")) return;
+  setSaving(true);
+  setProblem("");
+  try {
+   const result = await supabase.rpc("crm_catalogo_eliminar", {
+    articulo: editing.id, version_esperada: editing.updated_at,
+   });
+   if (result.error) throw result.error;
+   if (!result.data) {
+    setProblem("No se pudo eliminar. Actualiza la ficha y verifica tu acceso.");
+    reload();
+    return;
+   }
+   setOpened(false);
+   reload();
+  } catch {
+   setProblem("No se pudo confirmar la eliminación. Revisa el catálogo antes de reintentar.");
+  } finally {
+   setSaving(false);
+  }
+ }
  return <section className="space-y-4 rounded-2xl border bg-white p-5">
   <header className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Catálogo de productos y servicios</h2><button disabled={readOnly} className={primary} onClick={()=>open(null)}>+ Nuevo producto o servicio</button></header>
   <div className="flex flex-wrap items-center gap-2">
@@ -141,13 +164,14 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
     <span className="mt-3 block font-semibold">{money(i.precio)}</span><span className="text-sm text-slate-600">{i.disponibilidad}</span>
    </button>)}</div>}
   {pages>1&&<div className="flex justify-between"><button disabled={current<=1} onClick={()=>setPage(current-1)}>Anterior</button>{current} / {pages}<button disabled={current>=pages} onClick={()=>setPage(current+1)}>Siguiente</button></div>}
-  <CrmModal open={opened} busy={saving} title={editing?editing.nombre:"Nuevo producto o servicio"} onClose={()=>setOpened(false)} alert={problem}>
-   <form onSubmit={save}><fieldset disabled={saving||readOnly} className="grid gap-3 sm:grid-cols-2">
+  <CrmModal open={opened} busy={saving} title={editing?editing.nombre:"Nuevo producto o servicio"} onClose={()=>setOpened(false)} alert={problem}
+   actions={!readOnly&&<button type="submit" form="catalog-item-form" disabled={saving} className={primary}>Guardar</button>}>
+   <form id="catalog-item-form" onSubmit={save}><fieldset disabled={saving||readOnly} className="grid gap-3 sm:grid-cols-2">
     {editing&&urls[businessId+"/"+editing.id]&&<img src={urls[businessId+"/"+editing.id]} alt={editing.nombre} className="max-h-64 w-full object-contain sm:col-span-2"/>}
     {!readOnly&&<label className="sm:col-span-2">Foto principal (opcional, hasta 2 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={field} onChange={e=>setPhoto(e.target.files?.[0]||null)}/></label>}
     <label>Nombre<input className={field} required maxLength={240} value={draft.nombre} onChange={e=>update("nombre",e.target.value)}/></label>
-    <label>Tipo<select className={field} value={draft.tipo} onChange={e=>update("tipo",e.target.value)}><option>Producto</option><option>Servicio</option></select></label>
     <label>Precio unitario (MXN)<input className={field} required type="number" min="0" max="999999999999.99" step="0.01" value={draft.precio} onChange={e=>update("precio",e.target.value)}/></label>
+    <label>Tipo<select className={field} value={draft.tipo} onChange={e=>update("tipo",e.target.value)}><option>Producto</option><option>Servicio</option></select></label>
     <label>SKU<input className={field} value={draft.sku} onChange={e=>update("sku",e.target.value)}/></label>
     <label>Categoría<input className={field} list="catalog-categories" value={draft.categoria} onChange={e=>update("categoria",e.target.value)}/></label>
     <datalist id="catalog-categories">{categories.map(c=><option key={c} value={c}/>)}</datalist>
@@ -163,7 +187,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
      {!readOnly&&<button type="button" className={btn} onClick={()=>setFields(rows=>[...rows,{name:"",value:""}])}>+ Agregar campo</button>}
     </div>
     {editing&&<label><input type="checkbox" checked={draft.activo} onChange={e=>update("activo",e.target.checked)}/> Activo en el catálogo</label>}
-    {!readOnly&&<button className={primary+" sm:col-span-2"} type="submit">{saving?"Guardando…":"Guardar"}</button>}
+    {editing&&!readOnly&&<div className="border-t border-slate-200 pt-4 sm:col-span-2"><button type="button" className={btn+" border-red-200 text-red-700 hover:bg-red-50"} onClick={removeItem}>{editing.tipo==="Servicio"?"Eliminar servicio":"Eliminar producto"}</button></div>}
    </fieldset></form>
   </CrmModal>
  </section>;
