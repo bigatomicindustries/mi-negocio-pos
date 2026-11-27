@@ -116,6 +116,21 @@ useEffect(() => {
   const primerNombre = esPlatformAdmin ? nombreCuenta :
   perfil?.full_name?.trim().split(/\s+/)[0] || "Cuenta";
 
+  const encabezadoCuenta = esPlatformAdmin ? (
+    <div className="border-b border-slate-100 pb-1">
+      <Link href="/superadmin" onClick={() => setMostrarUsuario(false)}
+        className="block rounded-xl px-4 py-3 transition hover:bg-green-50">
+        <p className="text-sm font-semibold text-green-700">Administración SaaS</p>
+        <p className="mt-1 text-xs text-slate-500">Gestiona negocios de la plataforma</p>
+      </Link>
+    </div>
+  ) : perfil && (
+    <div className="border-b border-slate-100 px-4 py-3">
+      <p className="font-semibold text-slate-900">{nombreCuenta}</p>
+      <p className="mt-1 text-xs text-slate-500">{nombreRol(perfil.role)}</p>
+    </div>
+  );
+
   const opcionesCuenta = [
     { href: "/usuarios", nombre: "Empleados", descripcion: "Administra usuarios, roles y accesos", visible: perfil?.role === "admin" },
     { href: "/configuracion/pagos", nombre: "Configuración", descripcion: "Pagos y transferencias", visible: puedeAdministrar },
@@ -407,15 +422,7 @@ className={`text-xs transition-transform duration-200 ${
           {mostrarUsuario && (
             <div className="absolute right-0 top-full z-50 mt-2 w-[min(17rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
 
-              <div className="border-b border-slate-100 px-4 py-3">
-                <p className="font-semibold text-slate-900">
-                  {nombreCuenta}
-                </p>
-
-                {!esPlatformAdmin && <p className="mt-1 text-xs text-slate-500">
-                  {nombreRol(perfil.role)}
-                </p>}
-              </div>
+              {encabezadoCuenta}
 
 
               {opcionesCuenta}
@@ -437,21 +444,6 @@ className={`text-xs transition-transform duration-200 ${
                 </Link>
               )}
 
-{esPlatformAdmin && (
-  <Link
-    href="/superadmin"
-    onClick={() => setMostrarUsuario(false)}
-    className="block rounded-xl px-4 py-3 transition hover:bg-green-50"
-  >
-    <p className="text-sm font-semibold text-green-700">
-      Administración SaaS
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Gestiona negocios de la plataforma
-    </p>
-  </Link>
-)}
 
               <button
                 type="button"
@@ -695,15 +687,7 @@ onClick={() => {
 
               {mostrarUsuario && (
 <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border bg-white p-2 shadow-xl">
-                  <div className="border-b px-4 py-3">
-                    <p className="font-semibold text-slate-900">
-                      {nombreCuenta}
-                    </p>
-
-                    {!esPlatformAdmin && <p className="mt-1 text-xs text-slate-500">
-                      {nombreRol(perfil.role)}
-                    </p>}
-                  </div>
+                  {encabezadoCuenta}
 
                   {opcionesCuenta}
                   {perfil.role === "admin" && (
@@ -722,21 +706,6 @@ onClick={() => {
   </Link>
 )}
 
-{esPlatformAdmin && (
-  <Link
-    href="/superadmin"
-    onClick={() => setMostrarUsuario(false)}
-    className="block rounded-xl px-4 py-3 transition hover:bg-green-50"
-  >
-    <p className="text-sm font-semibold text-green-700">
-      Administración SaaS
-    </p>
-
-    <p className="mt-1 text-xs text-slate-500">
-      Gestiona negocios de la plataforma
-    </p>
-  </Link>
-)}
 
                   <button
                     type="button"
