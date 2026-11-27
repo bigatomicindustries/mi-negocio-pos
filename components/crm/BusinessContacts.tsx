@@ -118,7 +118,7 @@ export default function BusinessContacts({businessId,totalContacts,onSaved,userI
 
     <form id="crm-contact-form" onSubmit={save} className="grid gap-3 sm:grid-cols-2">
     {([["nombre","Nombre",120],["apellido","Apellido",120],["empresa","Empresa",180],["direccion","Dirección",2000]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-medium">{label}<input disabled={!!selected&&!editMode} className={field+" disabled:bg-slate-50"} maxLength={max} value={form[key]} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))}/></label>)}
-    {(["correo","telefono"] as const).map(kind=><ContactChannelFields key={kind} kind={kind} rows={form.medios} disabled={saving||readOnly||!!selected&&!editMode} onChange={medios=>setForm(v=>({...v,medios}))}/>)}
+    {(["telefono","correo"] as const).map(kind=><ContactChannelFields key={kind} kind={kind} rows={form.medios} disabled={saving||readOnly||!!selected&&!editMode} onChange={medios=>setForm(v=>({...v,medios}))}/>)}
     <label className="block text-sm font-medium">Fuente<select className={field+" disabled:bg-slate-50"} value={form.fuente} disabled={saving||readOnly||!!selected&&!editMode} onChange={e=>setForm(v=>({...v,fuente:e.target.value}))}>
       <option value="">Sin especificar</option>
       {sources.map(source=><option key={source} value={source}>{source}</option>)}
