@@ -416,12 +416,27 @@ export default function TableroComercialPage() {
         ? { titulo: "Hoy tienes contactos por atender", detalle: "Hay " + resumen.hoy + " seguimiento(s) programados para hoy. Registra el resultado en el historial.", tono: "border-amber-200 bg-amber-50" }
         : resumen.sinFecha > 0
           ? { titulo: "Organiza tus próximos contactos", detalle: "Hay " + resumen.sinFecha + " prospecto(s) abierto(s) sin fecha de seguimiento.", tono: "border-sky-200 bg-sky-50" }
-          : { titulo: "Agenda al día", detalle: "No hay contactos vencidos ni pendientes para hoy en la fuente seleccionada.", tono: "border-emerald-200 bg-emerald-50" };
+          : null;
 
   return (
     <main aria-label="Tablero CRM" className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-7">
 
+
+        {errorResumen && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">{errorResumen}</div>}
+        <section aria-label="Indicadores clave" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {kpis.map((kpi, index) => (
+            <article key={kpi.label} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <span aria-hidden="true" className={"absolute left-0 top-0 h-1 w-full " + kpi.accent} />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{kpi.label}</p>
+                <span aria-hidden="true" className="text-xs font-bold text-slate-300">0{index + 1}</span>
+              </div>
+              <p className={"mt-5 text-3xl font-extrabold tabular-nums tracking-tight " + kpi.color}>{hayDatos ? kpi.value : "—"}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{kpi.detail}</p>
+            </article>
+          ))}
+        </section>
 
         <section aria-label="Herramientas de análisis" className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap items-end gap-3">
@@ -463,22 +478,7 @@ export default function TableroComercialPage() {
           {mensajeReporte && <p role="status" className="w-full text-sm font-medium text-emerald-700">{mensajeReporte}</p>}
         </section>
 
-        {errorResumen && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">{errorResumen}</div>}
-        <section aria-label="Indicadores clave" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {kpis.map((kpi, index) => (
-            <article key={kpi.label} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <span aria-hidden="true" className={"absolute left-0 top-0 h-1 w-full " + kpi.accent} />
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{kpi.label}</p>
-                <span aria-hidden="true" className="text-xs font-bold text-slate-300">0{index + 1}</span>
-              </div>
-              <p className={"mt-5 text-3xl font-extrabold tabular-nums tracking-tight " + kpi.color}>{hayDatos ? kpi.value : "—"}</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">{kpi.detail}</p>
-            </article>
-          ))}
-        </section>
-
-        <section aria-label="Lectura de prioridades" className={"flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5 " + consejo.tono}>
+        {consejo && <section aria-label="Lectura de prioridades" className={"flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5 " + consejo.tono}>
           <div className="flex items-start gap-3">
             <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-lg shadow-sm">◎</span>
             <div>
@@ -487,7 +487,7 @@ export default function TableroComercialPage() {
             </div>
           </div>
           <Link href="/superadmin/prospectos" className="shrink-0 text-sm font-bold text-emerald-800 hover:underline">Ir a seguimiento →</Link>
-        </section>
+        </section>}
 
         <div className="grid gap-6 lg:grid-cols-12">
           <section aria-labelledby="embudo-titulo" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-7">
