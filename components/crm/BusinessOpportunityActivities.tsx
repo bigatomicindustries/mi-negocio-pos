@@ -1,12 +1,13 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import {supabase} from "@/lib/supabase";
-type Activity={id:string;tipo:string;descripcion:string;created_at:string;created_by:string};
+type Activity={id:string;tipo:string;descripcion:string;created_at:string};
 const types=[["llamada","Llamada"],["mensaje","Mensaje"],["reunion","Reunión"],["nota","Nota"]] as const;
-export default function BusinessOpportunityActivities({businessId,opportunityId,userId,children}:{children:React.ReactNode;businessId:string;opportunityId:string;userId:string}){
+export default function BusinessOpportunityActivities({businessId,opportunityId,userId,revision,children}:{revision:number;children:React.ReactNode;businessId:string;opportunityId:string;userId:string}){
  const [items,setItems]=useState<Activity[]>([]),[type,setType]=useState("nota"),[description,setDescription]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const refresh=useCallback(async()=>{setLoading(true);const r=await supabase.from("crm_negocio_actividades").select("id,tipo,descripcion,created_at,created_by").eq("business_id",businessId).eq("oportunidad_id",opportunityId).order("created_at",{ascending:false}).limit(100);if(r.error)setError("No se pudo consultar el historial: "+r.error.message);else{setItems(r.data||[]);setError("");}setLoading(false);},[businessId,opportunityId]);
- useEffect(()=>{void refresh();},[refresh]);
+ const [limit,setLimit]=useState(100);
+ const refresh=useCallback(async()=>{setLoading(true);const r=await supabase.from("crm_historial_oportunidad").select("id,tipo,descripcion,created_at").eq("oportunidad_id",opportunityId).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(limit+1);if(r.error)setError("No se pudo consultar el historial: "+r.error.message);else{setItems(r.data||[]);setError("");}setLoading(false);},[opportunityId,limit]);
+ useEffect(()=>{void refresh();},[refresh,revision]);
  async function save(e:React.FormEvent){e.preventDefault();const value=description.trim();if(saving||!value||value.length>2000)return;setSaving(true);setError("");setNotice("");try{const r=await supabase.from("crm_negocio_actividades").insert({business_id:businessId,oportunidad_id:opportunityId,tipo:type,descripcion:value,created_by:userId}).select("id");if(r.error)setError("No se pudo registrar la actividad: "+r.error.message);else if(!r.data?.length)setError("No se confirmó la actividad. Revisa tus permisos.");else{setDescription("");setNotice("Actividad registrada.");await refresh();}}catch{setError("No se pudo confirmar el guardado. Revisa tu conexión y verifica si se guardó antes de reintentar.");}finally{setSaving(false);}}
  return <>
   <div className="mt-5 grid items-stretch gap-4 md:grid-cols-2">
@@ -16,6 +17,7 @@ export default function BusinessOpportunityActivities({businessId,opportunityId,
   </section>
   {children}
   </div>
-  <section aria-label="Actividades registradas" className="mt-5 max-h-72 divide-y divide-slate-100 overflow-y-auto">{loading?<p className="py-3 text-sm text-slate-500">Cargando historial…</p>:items.map(a=><article key={a.id} className="py-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm capitalize text-slate-900">{a.tipo.replace("_"," ")}</strong><time className="text-xs text-slate-500">{new Date(a.created_at).toLocaleString("es-MX",{dateStyle:"medium",timeStyle:"short"})}</time></div><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{a.descripcion}</p></article>)}{!loading&&!items.length&&<p className="py-4 text-sm text-slate-500">Todavía no hay actividades registradas.</p>}</section>
+  <h3 className="mt-5 text-lg font-bold">Registro de actividad</h3>
+  <section aria-label="Actividades registradas" className="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto">{loading?<p className="py-3 text-sm text-slate-500">Cargando historial…</p>:items.slice(0,limit).map(a=><article key={a.id} className="py-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm capitalize text-slate-900">{a.tipo==="cambio_etapa"?"Cambio de etapa":a.tipo==="nota"?"Nota agregada":a.tipo.replace("_"," ")}</strong><time className="text-xs text-slate-500">{new Date(a.created_at).toLocaleString("es-MX",{dateStyle:"medium",timeStyle:"short"})}</time></div><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{a.descripcion}</p></article>)}{!loading&&items.length>limit&&<button type="button" className="py-2 text-sm font-semibold text-emerald-700" onClick={()=>setLimit(n=>n+100)}>Ver más actividad</button>}{!loading&&!items.length&&<p className="py-4 text-sm text-slate-500">Todavía no hay actividades registradas.</p>}</section>
  </>;
 }
