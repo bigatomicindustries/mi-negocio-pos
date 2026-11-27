@@ -1,8 +1,13 @@
 .budget { max-width: 76rem; margin: auto; padding: clamp(1rem,3vw,2.5rem); color: #172438; }
 .budget h1 { font-size: clamp(1.8rem,4vw,2.6rem); font-weight: 750; letter-spacing: -.04em; }
 .budget .subtitle, .budget small { color: #526478; }
-.budget .layout,.budget .stack { display:grid; gap:1rem; align-items:start; }
-.budget .layout { margin-top:1.5rem; }
+.budget .layout { display:grid; gap:1rem; align-items:start; }
+html:has(.budget), body:has(.budget) { overflow-x: clip; }
+.budget [hidden] { display: none; }
+.budget-heading { position:sticky; top:var(--navbar-height, 4.5rem); z-index:10; display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.5rem 1rem; margin-bottom:1rem; padding:.5rem 0; background:var(--background); }
+.budget .budget-nav { margin-left:auto; flex-wrap:nowrap; }
+.budget .budget-nav button { min-height:44px; font-weight:650; }
+@media(max-width: 30rem) { .budget .budget-nav { width:100%; } .budget .budget-nav button { flex:1; } }
 @media(min-width: 820px) { .budget .layout { grid-template-columns:minmax(17rem,1fr) minmax(0,1.8fr); } }
 .budget .panel { border:1px solid #dce3e9; background:white; border-radius:1rem; padding:clamp(1rem,2vw,1.5rem); }
 .budget h2 { font-size:1.2rem; font-weight:700; margin-bottom:1rem; }
