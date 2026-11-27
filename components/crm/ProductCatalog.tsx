@@ -13,6 +13,7 @@ const field="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 
 const btn="rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-50";
 const primary="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
 const money=(n:number)=>n.toLocaleString("es-MX",{style:"currency",currency:"MXN"});
+const validPrice = (value:string) => /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(value) && Number(value) <= 999999999999.99;
 export const catalogTotal=(lines:CatalogLine[])=>lines.reduce((sum,l)=>sum+Math.round(Number(l.precio)*100)*l.cantidad,0)/100;
 
 function useCatalog(businessId:string){
@@ -74,6 +75,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
  const {items,busy,error,reload}=useCatalog(businessId);
  const [query,setQuery]=useState(""),[category,setCategory]=useState(""),[status,setStatus]=useState(""),[archived,setArchived]=useState(false),[page,setPage]=useState(1);
  const [sortOrder,setSortOrder]=useState("name");
+ const [editingPrice,setEditingPrice]=useState(false);
  const [opened,setOpened]=useState(false),[editing,setEditing]=useState<Item|null>(null),[draft,setDraft]=useState<Draft>(empty);
  const [fields,setFields]=useState<{name:string;value:string}[]>([]),[saving,setSaving]=useState(false),[problem,setProblem]=useState("");
  const categories=[...new Set(items.map(i=>i.categoria).filter(Boolean))].sort();
@@ -100,6 +102,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
   return ()=>{live=false;clearInterval(timer);};
  },[paths,items]);
  function open(item:Item|null){
+  setEditingPrice(false);
   setPhoto(null);setEditing(item);setDraft(item?{...item,precio:String(item.precio)}:{...empty});setFields(Object.entries(item?.campos||{}).map(([name,value])=>({name,value})));setProblem("");setOpened(true);
  }
  function update(key:keyof Draft,value:string|boolean){setDraft(old=>({...old,[key]:value}));}
@@ -108,7 +111,7 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
   if(photo&&(!["image/jpeg","image/png","image/webp"].includes(photo.type)||photo.size>2097152)){setProblem("Elige una foto JPG, PNG o WebP de hasta 2 MB.");return;}
   const specs=fields.filter(f=>f.name.trim()||f.value.trim());
   if(specs.some(f=>!f.name.trim()||!f.value.trim())||new Set(specs.map(f=>f.name.trim().toLowerCase())).size!==specs.length){setProblem("Cada campo personalizado necesita un nombre único y un valor.");return;}
-  if(!draft.nombre.trim()||!draft.precio.trim()||!Number.isFinite(Number(draft.precio))||Number(draft.precio)<0){setProblem("Revisa el nombre y el precio.");return;}
+  if(!draft.nombre.trim()||!validPrice(draft.precio)){setProblem("Revisa el nombre y el precio.");return;}
   setSaving(true);setProblem("");
   const data={nombre:draft.nombre.trim(),tipo:draft.tipo,precio:Number(draft.precio),sku:draft.sku.trim(),categoria:draft.categoria.trim(),descripcion:draft.descripcion.trim(),disponibilidad:draft.disponibilidad,activo:draft.activo,campos:Object.fromEntries(specs.map(f=>[f.name.trim(),f.value.trim()]))};
   try{
@@ -177,7 +180,15 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    actions={!readOnly&&<button type="submit" form="catalog-item-form" disabled={saving} className={primary}>Guardar</button>}>
    <form id="catalog-item-form" onSubmit={save}><fieldset disabled={saving||readOnly} className="grid gap-3 sm:grid-cols-2">
     <label>Nombre<input className={field} required maxLength={240} value={draft.nombre} onChange={e=>update("nombre",e.target.value)}/></label>
-    <label>Precio unitario (MXN)<input className={field} required type="number" min="0" max="999999999999.99" step="0.01" value={draft.precio} onChange={e=>update("precio",e.target.value)}/></label>
+    <label>Precio unitario (MXN)
+     <input className={field} required type="text" inputMode="decimal" placeholder="$0.00"
+      value={!editingPrice&&validPrice(draft.precio)?money(Number(draft.precio)):draft.precio}
+      onFocus={()=>setEditingPrice(true)} onBlur={()=>setEditingPrice(false)}
+      onChange={e=>{
+       const value=e.target.value.trim().replace(/^\$\s*/, "");
+       update("precio", /^\d{1,3}(,\d{3})+(\.\d*)?$/.test(value)?value.replace(/,/g,""):value);
+      }}/>
+    </label>
     {editing&&urls[businessId+"/"+editing.id]&&<img src={urls[businessId+"/"+editing.id]} alt={editing.nombre} className="max-h-64 w-full object-contain sm:col-span-2"/>}
     {!readOnly&&<label className="sm:col-span-2">Foto principal (opcional, hasta 2 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={field} onChange={e=>setPhoto(e.target.files?.[0]||null)}/></label>}
     <label>Tipo<select className={field} value={draft.tipo} onChange={e=>update("tipo",e.target.value)}><option>Producto</option><option>Servicio</option></select></label>
