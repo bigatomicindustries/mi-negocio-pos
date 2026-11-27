@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import BarcodeCamera from "./BarcodeCamera";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
 type Product = {
   id: string;
   name: string;
+  barcode: string | null;
   stock: number;
   sale_price: number;
   minimum_stock: number;
@@ -26,9 +28,32 @@ type PaymentSettings = {
   transfer_enabled: boolean;
 };
 
+async function inventarioSucursal(branchId: string): Promise<Product[]> {
+  const products: Product[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from("branch_inventory")
+      .select("stock,minimum_stock,product:products!inner(id,name,barcode,sale_price,sale_unit)")
+      .eq("branch_id", branchId).order("product_id").range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const item = row.product as unknown as Pick<Product, "id" | "name" | "barcode" | "sale_price" | "sale_unit">;
+      products.push({ ...item, sale_price: Number(item.sale_price), stock: Number(row.stock), minimum_stock: Number(row.minimum_stock) });
+    }
+    if (!data || data.length < pageSize) break;
+  }
+  return products.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export default function VentasPage() {
   const { sucursalActiva, cargandoSucursales } = useAuth();
 
+  return <VentaSucursal key={sucursalActiva?.id ?? "sin-sucursal"} sucursalActiva={sucursalActiva} cargandoSucursales={cargandoSucursales} />;
+}
+
+function VentaSucursal({ sucursalActiva, cargandoSucursales }: Pick<ReturnType<typeof useAuth>, "sucursalActiva" | "cargandoSucursales">) {
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [scanStatus, setScanStatus] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cantidadesKg, setCantidadesKg] = useState<Record<string, string>>({});
@@ -111,43 +136,12 @@ useEffect(() => {
     setLoading(true);
     setError("");
 
-    const { data, error } = await supabase
-      .from("branch_inventory")
-      .select(`
-        stock,
-        minimum_stock,
-product:products!inner (
-  id,
-  name,
-  sale_price,
-  sale_unit
-)
-      `)
-      .eq("branch_id", sucursalActiva.id)
-      .order("product_id");
-
-    if (error) {
-      console.error(error);
-      setError(error.message);
+    try {
+      setProducts(await inventarioSucursal(sucursalActiva.id));
+    } catch {
+      setError("No se pudo cargar el inventario de la sucursal.");
       setProducts([]);
-      setLoading(false);
-      return;
     }
-
-const productosSucursal: Product[] = (data ?? []).map((item: any) => ({
-  id: item.product.id,
-  name: item.product.name,
-  sale_price: Number(item.product.sale_price),
-  stock: Number(item.stock),
-  minimum_stock: Number(item.minimum_stock),
-  sale_unit: item.product.sale_unit,
-}));
-
-    productosSucursal.sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-
-    setProducts(productosSucursal);
 
     // El carrito pertenece a la sucursal donde fue creado.
     // Al cambiar de sucursal, se vacía para evitar mezclar inventarios.
@@ -167,14 +161,37 @@ const productosSucursal: Product[] = (data ?? []).map((item: any) => ({
   // =========================
 
   const productosFiltrados = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return products.filter((product) =>
-      product.name.toLowerCase().includes(search.toLowerCase())
+      product.name.toLowerCase().includes(term) || product.barcode?.toLowerCase().includes(term)
     );
   }, [products, search]);
 
   // =========================
   // AGREGAR AL CARRITO
   // =========================
+
+function procesarEscaneo(raw: string) {
+  setCameraOpen(false);
+  const code = raw.trim();
+  // A UPC-A can also be read as an EAN-13 with a leading zero.
+  const alternate = /^0[0-9]{12}$/.test(code) ? code.slice(1) : /^[0-9]{12}$/.test(code) ? "0" + code : null;
+  const product = products.find(p => p.barcode === code) ?? (alternate && products.find(p => p.barcode === alternate));
+  if (!product) {
+    setSearch(code);
+    setScanStatus("Código " + code + " sin registrar en esta sucursal.");
+    return;
+  }
+  const quantity = cart.find(item => item.id === product.id)?.quantity ?? 0;
+  const increment = product.sale_unit === "kg" ? (quantity ? 0.25 : Math.min(0.25, product.stock)) : 1;
+  if (product.stock <= 0 || Number((quantity + increment).toFixed(3)) > product.stock) {
+    setScanStatus("Existencias insuficientes para agregar " + product.name + ".");
+    return;
+  }
+  agregarProducto(product);
+  setSearch("");
+  setScanStatus(product.name + " agregado al carrito.");
+}
 
 function agregarProducto(product: Product) {
   setCart((currentCart) => {
@@ -402,45 +419,12 @@ setMostrarPago(false);
     setCart([]);
 
     // Actualizar inventario en pantalla
-// Actualizar inventario de la sucursal en pantalla
-const { data: inventarioActualizado, error: errorInventario } =
-  await supabase
-    .from("branch_inventory")
-    .select(`
-      stock,
-      minimum_stock,
-product:products!inner (
-  id,
-  name,
-  sale_price,
-  sale_unit
-)
-    `)
-    .eq("branch_id", sucursalActiva.id)
-    .order("product_id");
-
-if (!errorInventario) {
-  const productosActualizados: Product[] =
-    (inventarioActualizado ?? []).map((item: any) => ({
-      id: item.product.id,
-      name: item.product.name,
-      sale_price: Number(item.product.sale_price),
-      sale_unit: item.product.sale_unit,
-      stock: Number(item.stock),
-      minimum_stock: Number(item.minimum_stock),
-    }));
-
-  productosActualizados.sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-
-  setProducts(productosActualizados);
-} else {
-  console.error(
-    "Error al actualizar inventario:",
-    errorInventario
-  );
-}
+    try {
+      setProducts(await inventarioSucursal(sucursalActiva.id));
+    } catch {
+      setProducts([]);
+      setError("La venta se registró. Recarga Ventas para actualizar las existencias.");
+    }
   } catch (error) {
     console.error("Error inesperado:", error);
     alert("Ocurrió un error inesperado al procesar la venta");
@@ -627,11 +611,18 @@ ${formatoDinero(subtotal)}`;
 
             <input
               type="text"
-              placeholder="Buscar producto..."
+              aria-label="Buscar por nombre o código de barras"
+              placeholder="Buscar por nombre o código de barras…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setScanStatus(""); }}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-green-500"
             />
+
+            <button type="button" disabled={loading || !!error || !sucursalActiva}
+              className="mt-3 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 lg:hidden [@media(pointer:coarse)]:inline-flex"
+              onClick={() => { setScanStatus(""); setCameraOpen(true); }}>Escanear código de barras</button>
+            {scanStatus && <p role="status" className="mt-2 text-sm text-slate-700">{scanStatus}</p>}
+            {cameraOpen && <BarcodeCamera onClose={() => setCameraOpen(false)} onCode={procesarEscaneo} />}
 
             {/* ERROR */}
 
