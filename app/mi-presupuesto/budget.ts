@@ -5,6 +5,10 @@ export type Kind = typeof kinds[number];
 export const categories = ["Alimentos", "Transporte", "Entretenimiento", "Cuidado personal", "Salud", "Hogar", "Suscripciones", "Ropa", "Otros"];
 export const money = (value: number) => value.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
+export function savingsConcept(goalName?: string) {
+  return ("Ahorro " + (goalName || "general")).toLocaleUpperCase("es-MX");
+}
+
 export function localDate(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }

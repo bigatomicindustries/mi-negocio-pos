@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
-import { localDate, money, type Entry } from "./budget";
+import { localDate, money, savingsConcept, type Entry } from "./budget";
 
 export default function MovementDetail({ entry, owner, category, card, onSave }: {
   entry: Entry; owner: string; category: string; card?: string; onSave: () => void;
@@ -28,13 +28,16 @@ export default function MovementDetail({ entry, owner, category, card, onSave }:
       setNotice("No se pudo guardar la fecha del movimiento.");
     } finally { setBusy(false); }
   }
+  const title = entry.kind === "Ahorro" ? savingsConcept(entry.goal_id ? category : undefined)
+    : entry.concept || (entry.kind === "Gasto" ? entry.category : entry.kind);
   const labelDate = entry.date_only
     ? new Date(entry.date_only + "T12:00").toLocaleDateString("es-MX", {dateStyle:"medium"}) + " · --:--"
     : new Date(entry.occurred_at).toLocaleString("es-MX", {dateStyle:"medium", timeStyle:"short"});
   return <details className="entry movement-detail">
-    <summary><span><b>{entry.concept || (entry.kind === "Gasto" ? entry.category : entry.kind)}</b>
+    <summary><span><b>{title}</b>
       <small>{entry.kind} · {category} · {entry.method}{card && " · " + card}</small><small>{labelDate}</small></span>
       <strong data-kind={entry.kind}>{entry.kind === "Gasto" ? "−" : "+"}{money(entry.amount)}</strong></summary>
+    {entry.kind === "Ahorro" && entry.concept && entry.concept !== title && <p>{entry.concept}</p>}
     <form onSubmit={save}><fieldset disabled={busy}>
       <legend>Editar fecha y hora</legend>
       <label>Fecha del movimiento<input required type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
