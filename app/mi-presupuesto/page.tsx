@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import CardsPanel from "./CardsPanel";
+import MovementDetail from "./MovementDetail";
 import MovementForm from "./MovementForm";
 import { kinds, localDate, money, periodBounds, periods, summarize, type Kind, type Period, type Summary } from "./budget";
 import "./budget.css";
@@ -39,7 +40,11 @@ function PersonalBudget({ owner }: { owner: string }) {
     let active = true;
     async function read() {
       try {
-        const { data, error } = await supabase.rpc("personal_budget_summary", periodBounds(day, period));
+        const bounds = periodBounds(day, period);
+        const { data, error } = await supabase.rpc("personal_budget_details", {
+          ...bounds, start_day: localDate(new Date(bounds.period_start)).slice(0, 10),
+          end_day: localDate(new Date(bounds.period_end)).slice(0, 10),
+        });
         if (active) setResult({ key, data: error ? null : data });
       } catch {
         if (active) setResult({ key, data: null });
@@ -69,6 +74,20 @@ function PersonalBudget({ owner }: { owner: string }) {
     } finally { setGoalBusy(false); }
   }
 
+  async function completeGoal(id: string) {
+    setGoalBusy(true);
+    setGoalNotice("");
+    try {
+      const { error } = await supabase.from("personal_goals").update({ completed_at: new Date().toISOString() })
+        .eq("id", id).eq("owner_id", owner).select("id").single();
+      if (error) throw error;
+      setGoalNotice("Meta guardada en el historial.");
+      refresh();
+    } catch {
+      setGoalNotice("No se pudo confirmar el cierre de la meta.");
+    } finally { setGoalBusy(false); }
+  }
+
   const data = result?.key === key ? result.data : null;
   const totals = summarize(data?.entries ?? []);
   const history = data?.entries.filter(entry => filter === "Todos" || entry.kind === filter);
@@ -88,7 +107,7 @@ function PersonalBudget({ owner }: { owner: string }) {
       </nav>
     </div>
     <div className="layout" hidden={view !== "Inicio"}>
-      <aside><MovementForm cards={result?.data?.cards ?? []} owner={owner} goals={result?.data?.goals ?? []} onSave={refresh} /></aside>
+      <aside><MovementForm cards={result?.data?.cards ?? []} owner={owner} goals={result?.data?.goals.filter(goal => !goal.completed_at) ?? []} onSave={refresh} /></aside>
         <section className="panel"><h2>Resumen del periodo</h2>
           <div className="filters">{periodControls}</div>
           {data ? <>
@@ -105,14 +124,22 @@ function PersonalBudget({ owner }: { owner: string }) {
     <section className="panel" hidden={view !== "Metas"}><h2>Mis metas de ahorro</h2>
           {!data && loadStatus}
           {data && <><div className="row"><span>Ahorro general acumulado</span><strong>{money(data.general)}</strong></div>
-          {data.goals.map(goal => <div className="category" key={goal.id}><div className="row"><b>{goal.name}</b><span>{money(goal.saved)} de {money(goal.target)}</span></div>
+          {data.goals.filter(goal => !goal.completed_at).map(goal => <div className="category" key={goal.id}><div className="row"><b>{goal.name}</b><span>{money(goal.saved)} de {money(goal.target)}</span></div>
             <progress aria-label={goal.name} value={Math.min(goal.saved, goal.target)} max={goal.target} />
-            <small>{goal.saved >= goal.target ? "Meta alcanzada" : "Faltan " + money(goal.target - goal.saved)}</small></div>)}</>}
+            <small>{goal.saved >= goal.target ? "Meta alcanzada" : "Faltan " + money(goal.target - goal.saved)}</small>
+            <button className="goal-action" disabled={goalBusy} onClick={() => completeGoal(goal.id)}>Marcar como cumplida</button></div>)}</>}
           <details><summary>Crear meta de ahorro</summary><form onSubmit={createGoal}>
             <label>Nombre de la meta<input name="name" required maxLength={80} pattern=".*\S.*" placeholder="Vacaciones" /></label>
             <label>Importe objetivo (MXN)<input type="number" name="target" required step="0.01" min="0.01" max="999999999999.99" inputMode="decimal" /></label>
             <button className="primary" disabled={goalBusy}>{goalBusy ? "Guardando…" : "Crear meta"}</button></form></details><p role="status">{goalNotice}</p>
         </section>
+    <section className="panel goal-history" hidden={view !== "Metas"}><h2>Historial de metas</h2>
+      {data && !data.goals.some(goal => goal.completed_at) && <p>Aún no hay metas cumplidas.</p>}
+      {data?.goals.filter(goal => goal.completed_at).sort((a,b) => b.completed_at!.localeCompare(a.completed_at!)).map(goal =>
+        <div className="row entry" key={goal.id}><div><b>{goal.name}</b>
+          <small>Cumplida el {new Date(goal.completed_at!).toLocaleDateString("es-MX")}</small></div>
+          <span>{money(goal.saved)} de {money(goal.target)}</span></div>)}
+    </section>
     <section className="panel" hidden={view !== "Tarjetas"}><h2>Mis tarjetas</h2>
       {data ? <CardsPanel owner={owner} cards={data.cards} onSave={refresh} /> : loadStatus}
     </section>
@@ -123,10 +150,10 @@ function PersonalBudget({ owner }: { owner: string }) {
           </div>
           {!data && loadStatus}
           {history?.length === 0 && <p>Sin movimientos para este filtro.</p>}
-          {history?.map(entry => <div className="row entry" key={entry.id}><div><b>{entry.concept || (entry.kind === "Gasto" ? entry.category : entry.kind)}</b>
-            <small>{entry.kind} · {entry.kind === "Ahorro" ? data?.goals.find(g => g.id === entry.goal_id)?.name || "Ahorro general" : entry.category} · {entry.method}{entry.card_id && " · " + (data?.cards.find(card => card.id === entry.card_id)?.name ?? "Tarjeta registrada")}</small>
-            <small>{new Date(entry.occurred_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</small></div>
-            <strong data-kind={entry.kind}>{entry.kind === "Gasto" ? "−" : "+"}{money(entry.amount)}</strong></div>)}</section>
+          {history?.map(entry => <MovementDetail key={entry.id} entry={entry} owner={owner}
+            category={entry.kind === "Ahorro" ? data?.goals.find(g => g.id === entry.goal_id)?.name ?? "Ahorro general" : entry.category}
+            card={data?.cards.find(card => card.id === entry.card_id)?.name} onSave={refresh} />)}
+    </section>
   </main>;
 }
 
