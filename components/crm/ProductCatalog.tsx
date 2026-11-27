@@ -73,12 +73,14 @@ export function OpportunityEstimate({businessId,lines,setLines,amount,setAmount,
 export default function ProductCatalog({businessId,readOnly}:{businessId:string;readOnly:boolean}){
  const {items,busy,error,reload}=useCatalog(businessId);
  const [query,setQuery]=useState(""),[category,setCategory]=useState(""),[status,setStatus]=useState(""),[archived,setArchived]=useState(false),[page,setPage]=useState(1);
+ const [sortOrder,setSortOrder]=useState("name");
  const [opened,setOpened]=useState(false),[editing,setEditing]=useState<Item|null>(null),[draft,setDraft]=useState<Draft>(empty);
  const [fields,setFields]=useState<{name:string;value:string}[]>([]),[saving,setSaving]=useState(false),[problem,setProblem]=useState("");
  const categories=[...new Set(items.map(i=>i.categoria).filter(Boolean))].sort();
  const names=[...new Set(items.flatMap(i=>Object.keys(i.campos)))].sort();
  const search=query.trim().toLocaleLowerCase("es");
  const filtered=items.filter(i=>i.activo!==archived&&(!category||category===i.categoria)&&(!status||status===i.disponibilidad)&&[i.nombre,i.sku,i.categoria].some(v=>v.toLocaleLowerCase("es").includes(search)));
+ if(sortOrder==="price")filtered.sort((a,b)=>a.precio-b.precio);
  const pages=Math.max(1,Math.ceil(filtered.length/24)),current=Math.min(page,pages);
  const [photo,setPhoto]=useState<File|null>(null),[urls,setUrls]=useState<Record<string,string>>({});
  const visibleItems=filtered.slice((current-1)*24,current*24);
@@ -155,6 +157,10 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
    <input type="search" aria-label="Buscar en el catálogo" placeholder="Buscar por nombre, SKU o categoría" className="min-w-0 grow basis-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
    <select aria-label="Categoría" className={btn} value={category} onChange={e=>{setCategory(e.target.value);setPage(1);}}><option value="">Todas las categorías</option>{categories.map(c=><option key={c}>{c}</option>)}</select>
    <select aria-label="Disponibilidad" className={btn} value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">Toda disponibilidad</option>{availability.map(a=><option key={a}>{a}</option>)}</select>
+   <select aria-label="Ordenar catálogo" className={btn} value={sortOrder} onChange={e=>{setSortOrder(e.target.value);setPage(1);}}>
+    <option value="name">Nombre (A–Z)</option>
+    <option value="price">Precio de menor a mayor</option>
+   </select>
    <div className="flex max-w-full flex-wrap items-center gap-2">
     <label className="text-sm"><input type="checkbox" checked={archived} onChange={e=>{setArchived(e.target.checked);setPage(1);}}/> Archivados</label>
     <button type="button" disabled={readOnly} className={primary} onClick={()=>open(null)}>+ Nuevo producto o servicio</button>
@@ -170,10 +176,10 @@ export default function ProductCatalog({businessId,readOnly}:{businessId:string;
   <CrmModal open={opened} busy={saving} title={editing?editing.nombre:"Nuevo producto o servicio"} onClose={()=>setOpened(false)} alert={problem}
    actions={!readOnly&&<button type="submit" form="catalog-item-form" disabled={saving} className={primary}>Guardar</button>}>
    <form id="catalog-item-form" onSubmit={save}><fieldset disabled={saving||readOnly} className="grid gap-3 sm:grid-cols-2">
-    {editing&&urls[businessId+"/"+editing.id]&&<img src={urls[businessId+"/"+editing.id]} alt={editing.nombre} className="max-h-64 w-full object-contain sm:col-span-2"/>}
-    {!readOnly&&<label className="sm:col-span-2">Foto principal (opcional, hasta 2 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={field} onChange={e=>setPhoto(e.target.files?.[0]||null)}/></label>}
     <label>Nombre<input className={field} required maxLength={240} value={draft.nombre} onChange={e=>update("nombre",e.target.value)}/></label>
     <label>Precio unitario (MXN)<input className={field} required type="number" min="0" max="999999999999.99" step="0.01" value={draft.precio} onChange={e=>update("precio",e.target.value)}/></label>
+    {editing&&urls[businessId+"/"+editing.id]&&<img src={urls[businessId+"/"+editing.id]} alt={editing.nombre} className="max-h-64 w-full object-contain sm:col-span-2"/>}
+    {!readOnly&&<label className="sm:col-span-2">Foto principal (opcional, hasta 2 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={field} onChange={e=>setPhoto(e.target.files?.[0]||null)}/></label>}
     <label>Tipo<select className={field} value={draft.tipo} onChange={e=>update("tipo",e.target.value)}><option>Producto</option><option>Servicio</option></select></label>
     <label>SKU<input className={field} value={draft.sku} onChange={e=>update("sku",e.target.value)}/></label>
     <label>Categoría<input className={field} list="catalog-categories" value={draft.categoria} onChange={e=>update("categoria",e.target.value)}/></label>
