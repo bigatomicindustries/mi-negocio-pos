@@ -31,6 +31,7 @@ function PersonalBudget({ owner }: { owner: string }) {
   const [filter, setFilter] = useState<Kind | "Todos">("Todos");
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ key: string; data: Summary | null } | null>(null);
+  const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalBusy, setGoalBusy] = useState(false);
   const [goalNotice, setGoalNotice] = useState("");
   const key = [day, period, revision].join("/");
@@ -67,6 +68,7 @@ function PersonalBudget({ owner }: { owner: string }) {
       });
       if (error) throw error;
       form.reset();
+      setShowGoalForm(false);
       setGoalNotice("Meta creada. Puedes seleccionarla al registrar un ahorro.");
       refresh();
     } catch {
@@ -121,17 +123,26 @@ function PersonalBudget({ owner }: { owner: string }) {
           </> : loadStatus}
         </section>
     </div>
-    <section className="panel" hidden={view !== "Metas"}><h2>Mis metas de ahorro</h2>
+    <section className="panel" hidden={view !== "Metas"}><div className="goal-heading">
+        <h2>Mis metas de ahorro</h2>
+        <button type="button" className="primary" aria-controls="create-personal-goal" aria-expanded={showGoalForm}
+          onClick={() => setShowGoalForm(open => !open)}>Crear meta</button>
+      </div>
+          <form id="create-personal-goal" hidden={!showGoalForm} onSubmit={createGoal}>
+            <label>Nombre de la meta<input name="name" required maxLength={80} pattern=".*\S.*" placeholder="Vacaciones" /></label>
+            <label>Importe objetivo (MXN)<input type="number" name="target" required step="0.01" min="0.01" max="999999999999.99" inputMode="decimal" /></label>
+            <button className="primary" disabled={goalBusy}>{goalBusy ? "Guardando…" : "Guardar meta"}</button></form>
           {!data && loadStatus}
           {data && <><div className="row"><span>Ahorro general acumulado</span><strong>{money(data.general)}</strong></div>
           {data.goals.filter(goal => !goal.completed_at).map(goal => <div className="category" key={goal.id}><div className="row"><b>{goal.name}</b><span>{money(goal.saved)} de {money(goal.target)}</span></div>
-            <progress aria-label={goal.name} value={Math.min(goal.saved, goal.target)} max={goal.target} />
-            <small>{goal.saved >= goal.target ? "Meta alcanzada" : "Faltan " + money(goal.target - goal.saved)}</small>
-            <button className="goal-action" disabled={goalBusy} onClick={() => completeGoal(goal.id)}>Marcar como cumplida</button></div>)}</>}
-          <details><summary>Crear meta de ahorro</summary><form onSubmit={createGoal}>
-            <label>Nombre de la meta<input name="name" required maxLength={80} pattern=".*\S.*" placeholder="Vacaciones" /></label>
-            <label>Importe objetivo (MXN)<input type="number" name="target" required step="0.01" min="0.01" max="999999999999.99" inputMode="decimal" /></label>
-            <button className="primary" disabled={goalBusy}>{goalBusy ? "Guardando…" : "Crear meta"}</button></form></details><p role="status">{goalNotice}</p>
+            <div className="goal-progress">
+              <progress aria-label={goal.name} value={Math.min(goal.saved, goal.target)} max={goal.target} />
+              {goal.saved >= goal.target && <button type="button" className="goal-check" disabled={goalBusy}
+                aria-label={`Marcar ${goal.name} como cumplida`} title="Marcar como cumplida"
+                onClick={() => completeGoal(goal.id)}><span aria-hidden="true">✓</span></button>}
+            </div>
+            <small>{goal.saved >= goal.target ? "Meta alcanzada" : "Faltan " + money(goal.target - goal.saved)}</small></div>)}</>}
+          <p role="status">{goalNotice}</p>
         </section>
     <section className="panel goal-history" hidden={view !== "Metas"}><h2>Historial de metas</h2>
       {data && !data.goals.some(goal => goal.completed_at) && <p>Aún no hay metas cumplidas.</p>}

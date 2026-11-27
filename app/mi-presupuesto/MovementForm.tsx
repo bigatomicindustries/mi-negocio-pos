@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
-import { categories, kinds, money, type Card, type Goal, type Kind } from "./budget";
+import { categories, kinds, savingsConcept, money, type Card, type Goal, type Kind } from "./budget";
 
 export default function MovementForm({ cards, goals, owner, onSave }: { cards: Card[]; goals: Goal[]; owner: string; onSave: () => void }) {
   const [kind, setKind] = useState<Kind>("Gasto");
@@ -24,7 +24,9 @@ export default function MovementForm({ cards, goals, owner, onSave }: { cards: C
       const { error } = await supabase.from("personal_entries").insert({
         owner_id: owner, kind, amount: fields.get("amount"),
         category: kind === "Gasto" ? category : kind,
-        method: fields.get("method"), concept: String(fields.get("concept") || "").trim(),
+        method: fields.get("method"), concept: kind === "Ahorro"
+          ? savingsConcept(goals.find(goal => goal.id === fields.get("goal"))?.name)
+          : String(fields.get("concept") || "").trim(),
         card_id: kind === "Gasto" && method === "Tarjeta" ? fields.get("card") || null : null,
         goal_id: kind === "Ahorro" ? fields.get("goal") || null : null,
       });
@@ -49,7 +51,7 @@ export default function MovementForm({ cards, goals, owner, onSave }: { cards: C
           <button className="primary" type="submit">{busy ? "Guardando…" : "Guardar"}</button>
         </div>
         <label>Importe (MXN)<input ref={amountRef} name="amount" type="number" inputMode="decimal" min="0.01" max="999999999999.99" step="0.01" required placeholder="0.00" /></label>
-        <label>Concepto (opcional)<input name="concept" maxLength={160} placeholder={kind === "Gasto" ? "¿Qué compraste?" : "Descripción breve"} /></label>
+        {kind !== "Ahorro" && <label>Concepto (opcional)<input name="concept" maxLength={160} placeholder={kind === "Gasto" ? "¿Qué compraste?" : "Descripción breve"} /></label>}
           <label>Método de pago<select name="method" value={method} onChange={event => setMethod(event.target.value)}><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select></label>
           {kind === "Gasto" && method === "Tarjeta" && <label>Tarjeta utilizada
             <select name="card" defaultValue="" required={cards.length > 0}>
