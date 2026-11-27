@@ -609,18 +609,29 @@ ${formatoDinero(subtotal)}`;
 
             {/* BUSCADOR */}
 
-            <input
-              type="text"
-              aria-label="Buscar por nombre o código de barras"
-              placeholder="Buscar por nombre o código de barras…"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setScanStatus(""); }}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-green-500"
-            />
-
-            <button type="button" disabled={loading || !!error || !sucursalActiva}
-              className="mt-3 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 lg:hidden [@media(pointer:coarse)]:inline-flex"
-              onClick={() => { setScanStatus(""); setCameraOpen(true); }}>Escanear código de barras</button>
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-green-500">
+              <input
+                type="text"
+                aria-label="Buscar por nombre o código de barras"
+                placeholder="Buscar por nombre o código de barras…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setScanStatus(""); }}
+                className="min-w-0 flex-1 rounded-xl bg-transparent px-4 py-3 outline-none"
+              />
+              <button
+                type="button"
+                aria-label="Escanear código de barras"
+                title="Escanear código de barras"
+                disabled={loading || !!error || !sucursalActiva}
+                className="mr-1 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 focus-visible:outline-2 disabled:opacity-50 lg:hidden [@media(pointer:coarse)]:inline-flex"
+                onClick={() => { setScanStatus(""); setCameraOpen(true); }}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" className="size-6">
+                  <path d="M3 7h4l2-3h6l2 3h4a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </button>
+            </div>
             {scanStatus && <p role="status" className="mt-2 text-sm text-slate-700">{scanStatus}</p>}
             {cameraOpen && <BarcodeCamera onClose={() => setCameraOpen(false)} onCode={procesarEscaneo} />}
 
