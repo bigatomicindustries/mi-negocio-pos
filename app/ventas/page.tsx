@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { imprimirTicket } from "@/lib/imprimirTicket";
 import BarcodeCamera from "./BarcodeCamera";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -52,6 +53,8 @@ export default function VentasPage() {
 }
 
 function VentaSucursal({ sucursalActiva, cargandoSucursales }: Pick<ReturnType<typeof useAuth>, "sucursalActiva" | "cargandoSucursales">) {
+  const { negocio, perfil } = useAuth();
+  const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanStatus, setScanStatus] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -352,7 +355,14 @@ const efectivoInsuficiente = efectivo < total;
 // COBRAR VENTA
 // =========================
 
+function cerrarCobro() {
+  if (procesandoCobro) return;
+  setMostrarPago(false);
+  setEfectivoRecibido("");
+}
+
 async function cobrarVenta() {
+  if (procesandoCobro) return;
   if (!sucursalActiva) {
     alert("No hay una sucursal activa seleccionada");
     return;
@@ -363,6 +373,7 @@ async function cobrarVenta() {
     return;
   }
 
+  setProcesandoCobro(true);
   try {
     const items = cart.map((item) => ({
       product_id: item.id,
@@ -388,6 +399,9 @@ const { data, error } = await supabase.rpc("create_sale", {
     }
 
 setVentaCompletada({
+  created_at: data?.created_at ?? new Date().toISOString(),
+  user_name: perfil?.full_name ?? null,
+  user_role: perfil?.role ?? null,
   number: data?.number,
 
   total: Number(
@@ -428,6 +442,8 @@ setMostrarPago(false);
   } catch (error) {
     console.error("Error inesperado:", error);
     alert("Ocurrió un error inesperado al procesar la venta");
+  } finally {
+    setProcesandoCobro(false);
   }
 }
 
@@ -1195,8 +1211,10 @@ ${formatoDinero(subtotal)}`;
 )}
 
 {mostrarPago && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3"
+    onClick={event => { if (event.target === event.currentTarget) cerrarCobro(); }}>
+    <div role="dialog" aria-modal="true" aria-label="Cobrar venta"
+      className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-2xl sm:p-5">
 
       <div className="mb-6">
         <p className="text-sm font-medium text-green-600">
@@ -1219,7 +1237,7 @@ ${formatoDinero(subtotal)}`;
     Método de pago
   </p>
 
-<div className="grid grid-cols-3 gap-3">
+<div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3">
   <button
     type="button"
     onClick={() => {
@@ -1227,7 +1245,7 @@ ${formatoDinero(subtotal)}`;
       setWhatsappTransferencia("");
       setErrorTransferencia("");
     }}
-    className={`rounded-xl border p-4 text-left transition ${
+    className={`rounded-xl border p-2 text-left sm:p-3 transition ${
       metodoPago === "cash"
         ? "border-green-600 bg-green-50 ring-1 ring-green-600"
         : "border-slate-200 bg-white hover:bg-slate-50"
@@ -1252,7 +1270,7 @@ ${formatoDinero(subtotal)}`;
       setWhatsappTransferencia("");
       setErrorTransferencia("");
     }}
-    className={`rounded-xl border p-4 text-left transition ${
+    className={`rounded-xl border p-2 text-left sm:p-3 transition ${
       metodoPago === "card"
         ? "border-green-600 bg-green-50 ring-1 ring-green-600"
         : "border-slate-200 bg-white hover:bg-slate-50"
@@ -1277,7 +1295,7 @@ ${formatoDinero(subtotal)}`;
       setErrorTransferencia("");
     }}
     disabled={!paymentSettings?.transfer_enabled}
-    className={`rounded-xl border p-4 text-left transition ${
+    className={`rounded-xl border p-2 text-left sm:p-3 transition ${
       metodoPago === "transfer"
         ? "border-green-600 bg-green-50 ring-1 ring-green-600"
         : "border-slate-200 bg-white hover:bg-slate-50"
@@ -1468,10 +1486,7 @@ ${formatoDinero(subtotal)}`;
     await cobrarVenta();
     setEfectivoRecibido("");
   }}
-  disabled={
-    metodoPago === "cash" &&
-    (efectivoInsuficiente || efectivo <= 0)
-  }
+  disabled={procesandoCobro || (metodoPago === "cash" && (efectivoInsuficiente || efectivo <= 0))}
   className="mt-6 w-full rounded-xl bg-green-600 px-5 py-4 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
 >
   {metodoPago === "cash"
@@ -1482,10 +1497,8 @@ ${formatoDinero(subtotal)}`;
 </button>
 
 <button
-  onClick={() => {
-    setMostrarPago(false);
-    setEfectivoRecibido("");
-  }}
+  onClick={cerrarCobro}
+  disabled={procesandoCobro}
   className="mt-3 w-full rounded-xl px-5 py-3 font-medium text-slate-500 hover:bg-slate-50"
 >
   Cancelar
@@ -1502,7 +1515,7 @@ ${formatoDinero(subtotal)}`;
 
 {ventaCompletada && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+    <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
 
       {/* ÉXITO */}
       <div className="text-center">
@@ -1640,7 +1653,10 @@ onClick={() => {
 )}
 
         <button
-          onClick={() => window.print()}
+          disabled={!negocio}
+          onClick={() => negocio && imprimirTicket(negocio.name, ventaCompletada,
+            ventaCompletada.items.map((item: CartItem) => ({ ...item, unit_price: item.sale_price }))
+          )}
           className="w-full rounded-xl bg-slate-100 px-5 py-3 font-medium text-slate-700 transition hover:bg-slate-200"
         >
           Imprimir ticket
