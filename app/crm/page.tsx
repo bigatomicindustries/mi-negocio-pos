@@ -1,5 +1,5 @@
 "use client";
-import {Suspense,useCallback,useEffect,useState} from "react";
+import {Suspense,useCallback,useEffect,useRef,useState} from "react";
 import {useAuth} from "@/context/AuthContext";
 import {supabase} from "@/lib/supabase";
 import ProductCatalog, {OpportunityEstimate,type CatalogLine} from "@/components/crm/ProductCatalog";
@@ -80,6 +80,13 @@ function NegocioCRMContent(){
  }
  const [allowed,setAllowed]=useState(false),[checking,setChecking]=useState(true),[loading,setLoading]=useState(false);
  const [boardPages,setBoardPages]=useState<Record<string,number>>({}),[boardCounts,setBoardCounts]=useState<Record<string,number>>({}),[boardRows,setBoardRows]=useState<Opportunity[]>([]);
+ const [search,setSearch]=useState(""),[boardQuery,setBoardQuery]=useState("");
+ const [boardAmounts,setBoardAmounts]=useState<Record<string,number>>({});
+ const requestNumber=useRef(0);
+ useEffect(()=>{
+  const timer=setTimeout(()=>{if(boardQuery!==search.trim()){setBoardPages({});setBoardQuery(search.trim());}},200);
+  return ()=>clearTimeout(timer);
+ },[search,boardQuery]);
  const [agendaRevision,setAgendaRevision]=useState(0);
  const [metrics,setMetrics]=useState<{counts:Record<string,number>;amounts:Record<string,number>;agenda:{counts:Record<string,number>;rows:(Task&{oportunidad_titulo:string})[]}}|null>(null);
  const [contactCount,setContactCount]=useState(0);
@@ -115,23 +122,34 @@ function NegocioCRMContent(){
 
  const load=useCallback(async()=>{
   if(!negocio?.id)return;
+  const request=++requestNumber.current;
   setLoading(true);setError("");
   try{
   const [count]=await Promise.all([
    supabase.from("crm_contactos").select("id",{count:"exact",head:true}).eq("ambito","negocio").eq("business_id",negocio.id).is("archivado_at",null)
   ]);
+  if(request!==requestNumber.current)return;
   if(count.error){setError("No fue posible cargar el CRM: "+count.error.message);return;}
-  const board=section==="oportunidades"?await Promise.all(stages.map(stage=>{const start=((boardPages[stage]||1)-1)*25;return supabase.from("crm_negocio_oportunidades").select("id,contacto_id,titulo,etapa,valor_estimado,partidas,nota_fija,updated_at,created_at",{count:"exact"}).eq("business_id",negocio.id).eq("etapa",stage).order("created_at",{ascending:false}).order("id",{ascending:false}).range(start,start+24);})):null;
-  if(board?.some(r=>r.error)){setError("No fue posible cargar el tablero comercial.");return;}
-  const nextRows=board?.flatMap(r=>r.data||[])||[];
-  if(board){const counts=Object.fromEntries(stages.map((s,i)=>[s,board[i].count||0]));setBoardCounts(counts);const corrected=Object.fromEntries(stages.map(s=>[s,Math.min(boardPages[s]||1,Math.max(1,Math.ceil(counts[s]/25)))]));if(stages.some(s=>corrected[s]!== (boardPages[s]||1)))setBoardPages(corrected);}
+  const board=section==="oportunidades"?await supabase.rpc("crm_tablero_comercial",{p_business_id:negocio.id,p_busqueda:boardQuery,p_paginas:boardPages}):null;
+  if(request!==requestNumber.current)return;
+  if(board?.error){setError("No fue posible cargar el tablero comercial.");return;}
+  const groups:{etapa:string;cantidad:number;importe:number;filas:Opportunity[]}[]=board?.data??[];
+  const nextRows=groups.flatMap(group=>group.filas);
+  if(board){
+   const counts=Object.fromEntries(groups.map(g=>[g.etapa,Number(g.cantidad)]));
+   setBoardCounts(counts);
+   setBoardAmounts(Object.fromEntries(groups.map(g=>[g.etapa,Number(g.importe)])));
+   const corrected=Object.fromEntries(stages.map(s=>[s,Math.min(boardPages[s]||1,Math.max(1,Math.ceil((counts[s]||0)/25)))]));
+   if(stages.some(s=>corrected[s]!== (boardPages[s]||1)))setBoardPages(corrected);
+  }
   const ids=[...new Set(nextRows.map(row=>row.contacto_id))];
   const batches=await Promise.all(Array.from({length:Math.ceil(ids.length/100)},(_,i)=>supabase.from("crm_contactos").select("id,nombre,apellido,empresa,direccion,notas,updated_at,crm_contacto_medios(tipo,valor)").eq("business_id",negocio.id).eq("ambito","negocio").is("archivado_at",null).in("id",ids.slice(i*100,(i+1)*100))));
+  if(request!==requestNumber.current)return;
   const failed=batches.find(r=>r.error);
   if(failed){setError("No fue posible cargar los contactos vinculados.");return;}
   setAgendaRevision(v=>v+1);setBoardRows(nextRows);setContactCount(count.count||0);setContacts(batches.flatMap(r=>r.data||[]));
-  }catch{setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{setLoading(false);}
- },[negocio?.id,section,boardPages]);
+  }catch{if(request===requestNumber.current)setError("No fue posible cargar el CRM. Revisa tu conexión.");}finally{if(request===requestNumber.current)setLoading(false);}
+ },[negocio?.id,section,boardPages,boardQuery]);
  useEffect(()=>{
   let cancelled=false;
   async function check(){
@@ -199,7 +217,6 @@ function NegocioCRMContent(){
  if(cargando||checking)return <main className="mx-auto max-w-6xl p-8">Validando acceso al CRM…</main>;
  if(!allowed)return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-bold">CRM no disponible</h1><p className="mt-3 text-slate-600">Tu cuenta no tiene acceso al CRM de este negocio. Consulta al administrador.</p>{error&&<p role="alert" className="mt-3 text-red-700">{error}</p>}</main>;
  const contactName=(id:string)=>{const c=contacts.find(x=>x.id===id);return c?[c.nombre,c.apellido,c.empresa].filter(Boolean).join(" · "):"Contacto no disponible";};
- const boardTotal=Object.values(boardCounts).reduce((a,b)=>a+b,0);
  const totalOpps=Object.values(metrics?.counts||{}).reduce((a,b)=>a+Number(b),0);
  const totalAmount=Object.values(metrics?.amounts||{}).reduce((a,b)=>a+Number(b),0);
  return <CRMWorkspace basePath="/crm" section={section} subtitle={negocio?.name+" · Datos exclusivos de tu negocio"}>
@@ -224,18 +241,24 @@ function NegocioCRMContent(){
   {loading&&<p className="text-sm text-slate-500">Actualizando datos…</p>}
   {section==="oportunidades"&&<div className="space-y-6">
    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
-    {label:"Oportunidades abiertas",count:stages.filter(s=>s!=="ganado"&&s!=="perdido").reduce((n,s)=>n+(boardCounts[s]||0),0),detail:"En seguimiento"},
+    {label:"Oportunidades abiertas",count:stages.filter(s=>s!=="ganado"&&s!=="perdido").reduce((n,s)=>n+(metrics?.counts[s]||0),0),detail:"En seguimiento"},
     {label:"Valor en negociación",count:metrics?money(stages.filter(s=>s!=="ganado"&&s!=="perdido").reduce((n,s)=>n+Number(metrics.amounts[s]||0),0)):"—",detail:"Monto estimado total"},
-    {label:"Ganadas",count:boardCounts.ganado||0,detail:metrics?"Monto estimado: "+money(Number(metrics.amounts.ganado||0)):"Sin datos actualizados"},
-    {label:"Perdidas",count:boardCounts.perdido||0,detail:"Oportunidades cerradas"}
+    {label:"Ganadas",count:metrics?.counts.ganado||0,detail:metrics?"Monto estimado: "+money(Number(metrics.amounts.ganado||0)):"Sin datos actualizados"},
+    {label:"Perdidas",count:metrics?.counts.perdido||0,detail:"Oportunidades cerradas"}
    ].map(item=><div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{item.label}</p><p className="mt-2 break-words text-2xl font-bold text-slate-900">{item.count}</p><p className="mt-2 text-xs text-slate-500">{item.detail}</p></div>)}</div>
 
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-4">
-     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-lg font-bold">Tablero comercial</h2>
-      <div className="flex flex-wrap items-center gap-2"><span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">{boardTotal} {boardTotal===1?"oportunidad":"oportunidades"}</span><button type="button" disabled={readOnly} onClick={()=>openDialog("opportunity")} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear oportunidad</button></div>
-     </div>
-     <p className="mt-1 text-sm text-slate-500">Desliza horizontalmente para ver todas las etapas. Puedes arrastrar tarjetas o cambiar su etapa desde el selector.</p></div><CRMOpportunityBoard rows={boardRows} amounts={metrics?.amounts} counts={boardCounts} pages={boardPages} onPage={(stage,page)=>setBoardPages(old=>({...old,[stage]:page}))} contactName={contactName} busy={saving||loading} onMove={changeStage} onOpen={openOpportunity}/></section>
+   <section aria-label="Herramientas de oportunidades" className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end">
+    <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700">Buscar oportunidades
+     <input type="search" value={search} onChange={e=>setSearch(e.target.value)} className={input+" mt-2"} placeholder="Nombre de contacto, empresa u oportunidad…"/>
+    </label>
+    <button type="button" disabled={readOnly} onClick={()=>openDialog("opportunity")} className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">+ Nueva oportunidad</button>
+   </section>
+   <section className="min-w-0 space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+     <h2 className="text-xl font-bold">Tablero comercial</h2>
+     <p className="text-sm text-slate-500">Arrastra una tarjeta a otra columna o utiliza «Mover a etapa». Desplázate horizontalmente para ver todas las etapas.</p>
+    </div>
+    <CRMOpportunityBoard rows={boardRows} amounts={boardAmounts} counts={boardCounts} pages={boardPages} onPage={(stage,page)=>setBoardPages(old=>({...old,[stage]:page}))} contactName={contactName} busy={saving||loading} onMove={changeStage} onOpen={openOpportunity}/></section>
   </div>}
     <CrmModal open={dialog==="opportunity"} title="Crear oportunidad" description="Vincula una negociación a un contacto existente." onClose={()=>setDialog(null)} busy={saving} alert={error}>
      <form onSubmit={addOpportunity} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Título<input className={input+" mt-1"} maxLength={240} value={title} onChange={e=>setTitle(e.target.value)} required/></label>{profileContact?<p className="text-sm">Contacto: <strong>{[profileContact.nombre,profileContact.apellido].filter(Boolean).join(" ")||profileContact.empresa}</strong></p>:<ContactPicker businessId={negocio!.id} value={contact} onChange={setContact} disabled={saving}/>}<OpportunityEstimate businessId={negocio!.id} lines={createLines} setLines={setCreateLines} amount={amount} setAmount={setAmount} disabled={saving||readOnly}/><button disabled={saving||!contact} className="w-full rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Crear oportunidad</button>{!contactCount&&<p className="text-sm text-amber-700">Necesitas un contacto registrado para crear oportunidades.</p>}</form>
