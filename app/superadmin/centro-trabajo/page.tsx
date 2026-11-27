@@ -174,16 +174,10 @@ export default function CentroTrabajoPage() {
     return !q || [t.nombre, t.negocio, t.whatsapp].some(v => v?.toLocaleLowerCase("es-MX").includes(q));
   }), [ordenadas, filtro, busqueda, hoy]);
 
-  if (authLoading || !esPlatformAdmin) return <main className="mx-auto max-w-6xl p-8 text-slate-600">Verificando acceso…</main>;
+  if (authLoading || !esPlatformAdmin) return <main aria-label="Centro de trabajo" className="mx-auto max-w-6xl p-8 text-slate-600">Verificando acceso…</main>;
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
       <div className="mx-auto max-w-6xl space-y-7">
-        <header className="rounded-3xl bg-gradient-to-br from-slate-950 to-emerald-950 px-6 py-9 text-white sm:px-9">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM</p>
-          <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Centro de trabajo comercial</h1>
-          <p className="mt-3 max-w-2xl text-slate-300">Empieza por los contactos vencidos, continúa con los de hoy y organiza los próximos seguimientos.</p>
-          <p className="mt-4 text-xs text-slate-400">Zona horaria: Ciudad de México · Fecha de referencia: {hoy}</p>
-        </header>
         <section aria-label="Prioridades del día" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {([
             ["todos", "Pendientes"], ["vencidos", "Vencidos"], ["hoy", "Para hoy"],

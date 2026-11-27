@@ -301,14 +301,8 @@ export default function ContactosPage() {
 
   if (cargando || !esPlatformAdmin) return null;
   return (
-    <main className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
+    <main aria-label="Contactos" className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-7">
-        <header className="rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-9 text-white shadow-lg sm:px-9">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Mi Negocio · CRM</p>
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Contactos, <span className="text-emerald-300">sin complicaciones.</span></h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Personas y empresas en un solo directorio, con varios teléfonos y correos. El sistema bloquea nuevos datos duplicados.</p>
-          <p className="mt-4 text-xs text-emerald-200">Directorio interno · Acceso para clientes desactivado</p>
-        </header>
         <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <label className="w-full max-w-md text-xs font-bold text-slate-600">Buscar en todos los contactos
             <input value={query} maxLength={120} onChange={e => { setQuery(e.target.value); setPage(0); }} className={field} placeholder="Nombre, empresa, teléfono o correo" />

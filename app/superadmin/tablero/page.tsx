@@ -157,7 +157,6 @@ export default function TableroComercialPage() {
   const [fuente, setFuente] = useState<FiltroFuente>("todas");
   const [serie, setSerie] = useState<PuntoTendencia[]>([]);
   const [fuentesResumen, setFuentesResumen] = useState<ResumenFuente[]>([]);
-  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
   const [mensajeReporte, setMensajeReporte] = useState("");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargandoResumen, setCargandoResumen] = useState(true);
@@ -245,7 +244,6 @@ export default function TableroComercialPage() {
           { fuente: "lead", total: cantidades[14], convertidos: cantidades[15] },
         ]);
         setSerie(intervalos.map((p, i) => ({ ...p, cantidad: cantidades[16 + i] })));
-        setUltimaActualizacion(new Date());
       }
       setCargandoResumen(false);
     }
@@ -421,34 +419,9 @@ export default function TableroComercialPage() {
           : { titulo: "Agenda al día", detalle: "No hay contactos vencidos ni pendientes para hoy en la fuente seleccionada.", tono: "border-emerald-200 bg-emerald-50" };
 
   return (
-    <main className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
+    <main aria-label="Tablero CRM" className="min-h-screen bg-[#f5f7f6] px-4 py-8 text-slate-900 sm:px-6 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-7">
 
-        <header className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 sm:px-9 sm:py-10">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full border border-emerald-400/20 bg-emerald-400/10 blur-2xl" />
-          <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-12 h-40 w-40 rounded-full border border-emerald-200/10" />
-          <div className="relative flex flex-wrap items-end justify-between gap-6">
-            <div className="max-w-2xl">
-              <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.17em] text-emerald-200">
-                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                Mi Negocio · CRM
-              </p>
-              <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Tu operación comercial, <span className="text-emerald-300">en perspectiva.</span></h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
-                Comprende de dónde llegan tus oportunidades, en qué etapa están y qué contactos necesitan atención.
-              </p>
-            </div>
-            <Link href="/superadmin/prospectos"
-              className="inline-flex items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200">
-              Gestionar prospectos <span aria-hidden="true" className="ml-2">↗</span>
-            </Link>
-          </div>
-          <div className="relative mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 text-xs text-slate-300">
-            <span>Zona horaria: Ciudad de México</span>
-            <span aria-hidden="true" className="hidden text-white/30 sm:inline">•</span>
-            <span>Último corte: {ultimaActualizacion ? fechaHora(ultimaActualizacion.toISOString()) : "Por calcular"}</span>
-          </div>
-        </header>
 
         <section aria-label="Herramientas de análisis" className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap items-end gap-3">
