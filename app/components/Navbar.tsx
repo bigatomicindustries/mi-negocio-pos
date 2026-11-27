@@ -112,7 +112,7 @@ useEffect(() => {
     router.refresh();
   }
 
-  const nombreCuenta = esPlatformAdmin ? "Administración SaaS" : perfil?.full_name;
+  const nombreCuenta = esPlatformAdmin ? "SUPERADMIN" : perfil?.full_name;
   const primerNombre = esPlatformAdmin ? nombreCuenta :
   perfil?.full_name?.trim().split(/\s+/)[0] || "Cuenta";
 
@@ -395,15 +395,15 @@ className={`text-xs transition-transform duration-200 ${
               setMostrarMas(false);
             }}
             aria-label={nombreCuenta}
-            className="flex h-11 max-w-[135px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition active:bg-slate-100"
+            className={`flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition active:bg-slate-100 ${esPlatformAdmin ? "" : "max-w-[135px]"}`}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-              {nombreCuenta
+              {(esPlatformAdmin ? "A" : nombreCuenta)
                 ?.charAt(0)
                 .toUpperCase()}
             </div>
 
-            <span className="max-w-[62px] truncate text-sm font-semibold text-slate-800">
+            <span className={`truncate text-sm font-semibold text-slate-800 ${esPlatformAdmin ? "" : "max-w-[62px]"}`}>
               {primerNombre}
             </span>
 
@@ -665,7 +665,7 @@ onClick={() => {
                 className="flex items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-slate-100"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100 font-bold text-green-700">
-                  {nombreCuenta
+                  {(esPlatformAdmin ? "A" : nombreCuenta)
                     ?.charAt(0)
                     .toUpperCase()}
                 </div>
