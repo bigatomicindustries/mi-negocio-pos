@@ -166,6 +166,7 @@ useEffect(() => {
   ) : null;
 
   const opcionesCuenta = [
+    { href: "/mi-presupuesto", nombre: "Mi Presupuesto", descripcion: "Gastos, ingresos y metas personales", visible: true },
     { href: "/sucursales", nombre: "Sucursales", descripcion: "Administra las ubicaciones de tu negocio", visible: perfil?.role === "admin" && !!negocio && businessConSucursales === negocio.id },
     { href: "/usuarios", nombre: "Empleados", descripcion: "Administra usuarios, roles y accesos", visible: perfil?.role === "admin" },
     { href: "/configuracion/pagos", nombre: "Configuración", descripcion: "Pagos y transferencias", visible: puedeAdministrar },
