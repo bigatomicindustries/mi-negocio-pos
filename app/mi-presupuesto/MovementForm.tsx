@@ -2,10 +2,11 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
-import { categories, kinds, localDate, type Goal, type Kind } from "./budget";
+import { categories, kinds, localDate, money, type Card, type Goal, type Kind } from "./budget";
 
-export default function MovementForm({ goals, owner, onSave }: { goals: Goal[]; owner: string; onSave: () => void }) {
+export default function MovementForm({ cards, goals, owner, onSave }: { cards: Card[]; goals: Goal[]; owner: string; onSave: () => void }) {
   const [kind, setKind] = useState<Kind>("Gasto");
+  const [method, setMethod] = useState("Efectivo");
   const [category, setCategory] = useState("Otros");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -25,10 +26,12 @@ export default function MovementForm({ goals, owner, onSave }: { goals: Goal[]; 
         category: kind === "Gasto" ? category : kind,
         method: fields.get("method"), concept: String(fields.get("concept") || "").trim(),
         occurred_at: fields.get("date") ? new Date(String(fields.get("date"))).toISOString() : new Date().toISOString(),
+        card_id: kind === "Gasto" && method === "Tarjeta" ? fields.get("card") || null : null,
         goal_id: kind === "Ahorro" ? fields.get("goal") || null : null,
       });
       if (error) throw error;
       form.reset();
+      setMethod("Efectivo");
       setNotice("Movimiento guardado.");
       onSave();
       amountRef.current?.focus();
@@ -51,7 +54,14 @@ export default function MovementForm({ goals, owner, onSave }: { goals: Goal[]; 
         {kind === "Gasto" && <label>Categoría<select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(name => <option key={name}>{name}</option>)}</select></label>}
         {kind === "Ahorro" && <label>Destino del ahorro<select name="goal"><option value="">Ahorro general</option>{goals.map(goal => <option value={goal.id} key={goal.id}>{goal.name}</option>)}</select></label>}
         <details><summary>Método de pago y fecha</summary>
-          <label>Método de pago<select name="method"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select></label>
+          <label>Método de pago<select name="method" value={method} onChange={event => setMethod(event.target.value)}><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select></label>
+          {kind === "Gasto" && method === "Tarjeta" && <label>Tarjeta utilizada
+            <select name="card" defaultValue="" required={cards.length > 0}>
+              <option value="">{cards.length ? "Selecciona una tarjeta" : "Sin tarjeta registrada"}</option>
+              {cards.map(card => <option key={card.id} value={card.id}>{card.name} · {card.card_type} · {money(card.available)}</option>)}
+            </select>
+            {!cards.length && <small>Registra tu tarjeta en Tarjetas para llevar su saldo.</small>}
+          </label>}
           <label>Fecha y hora<input type="datetime-local" name="date" onFocus={e => { if (!e.target.value) e.target.value = localDate(new Date()); }} /></label>
           <small>Si dejas la fecha vacía se usa la hora del registro.</small>
         </details>

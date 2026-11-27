@@ -41,3 +41,12 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .movement-actions .choices { flex-wrap:nowrap; }
 .budget .movement-actions button { padding:.5rem clamp(.3rem,.6vw,.65rem); font-size:.85rem; }
 .budget .movement-actions .primary { width:auto; }
+.budget .personal-cards { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr)); }
+.budget .personal-cards article { min-width:0; border:1px solid #dce3e9; border-radius:.75rem; padding:1rem; overflow-wrap:anywhere; }
+.budget .personal-cards h3 { margin:0; }
+.budget .personal-cards article p { margin:.8rem 0; }
+.budget .personal-cards article strong { display:block; font-size:1.4rem; }
+.budget .balance-chart svg { width:100%; max-height:7rem; color:#126545; }
+.budget .balance-chart figcaption { font-size:.85rem; }
+.budget .card-form form { max-width:28rem; }
+@media(max-width: 30rem) { .budget .budget-nav button { padding-inline:.25rem; font-size:.8rem; } }
