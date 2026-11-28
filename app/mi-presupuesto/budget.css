@@ -42,6 +42,9 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .movement-actions button { padding:.5rem clamp(.3rem,.6vw,.65rem); font-size:.85rem; }
 .budget .movement-actions .primary { width:auto; }
 .budget .personal-cards { display:grid; gap:1rem; grid-template-columns:minmax(0,1fr); }
+.budget .cash-balance { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:0 0 1rem; padding:clamp(1rem,2vw,1.5rem); border-radius:1rem; background:#126545; color:white; font-weight:700; }
+.budget .cash-balance dt { font-size:1.2rem; }
+.budget .cash-balance dd { margin:0; text-align:right; font-size:clamp(1.2rem,3vw,1.75rem); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 @media(min-width:600px) { .budget .personal-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(min-width:960px) { .budget .personal-cards { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 .budget .personal-cards article { display:flex; flex-direction:column; justify-content:space-between; gap:.85rem; aspect-ratio:1.586; min-width:0; border:1px solid #b8d5c9; border-radius:1rem; background:linear-gradient(125deg,#e9f5ef,#f9fcfa); padding:1rem; overflow-wrap:anywhere; }
@@ -77,6 +80,8 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .editor-actions button.danger { background:#a92e34; color:white; }
 
 .budget .period-controls { display:flex; align-items:flex-end; flex-wrap:wrap; justify-content:flex-end; gap:.6rem 1rem; margin-left:auto; }
+.budget .filters { margin-bottom:1rem; }
+.budget .filters .period-controls button { height:2.65rem; }
 .budget .history-filters .period-controls { flex-wrap:nowrap; flex:none; }
 .budget .reference-parts { display:flex; align-items:flex-end; gap:.35rem; }
 .budget .reference-parts label { margin:0; }

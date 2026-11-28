@@ -151,9 +151,15 @@ function PersonalBudget({ owner }: { owner: string }) {
           <small>Cumplida el {new Date(goal.completed_at!).toLocaleDateString("es-MX")}</small></div>
           <span>{money(goal.saved)} de {money(goal.target)}</span></div>)}
     </section>
-    <section className="panel" hidden={view !== "Tarjetas"}>
-      {data ? <CardsPanel owner={owner} cards={data.cards.filter(card => !card.archived_at)} onSave={refresh} /> : loadStatus}
-    </section>
+    <div hidden={view !== "Tarjetas"}>
+      {data && <dl className="cash-balance">
+        <dt>Efectivo</dt>
+        <dd>{typeof data.cash_available === "number" ? money(data.cash_available) : "Saldo no disponible"}</dd>
+      </dl>}
+      <section className="panel">
+        {data ? <CardsPanel owner={owner} cards={data.cards.filter(card => !card.archived_at)} onSave={refresh} /> : loadStatus}
+      </section>
+    </div>
     <section className="panel" hidden={view !== "Historial"}><h2>Historial de movimientos</h2>
           <div className="history-filters">
             <div className="choices">{(["Todos", ...kinds] as const).map(item => <button key={item} aria-pressed={item === filter} onClick={() => setFilter(item)}>{item}</button>)}</div>
