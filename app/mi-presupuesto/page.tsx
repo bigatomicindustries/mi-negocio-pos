@@ -109,7 +109,7 @@ function PersonalBudget({ owner }: { owner: string }) {
       </nav>
     </div>
     <div className="layout" hidden={view !== "Inicio"}>
-      <aside><MovementForm cards={result?.data?.cards ?? []} owner={owner} goals={result?.data?.goals.filter(goal => !goal.completed_at) ?? []} onSave={refresh} /></aside>
+      <aside><MovementForm cards={result?.data?.cards.filter(card => !card.archived_at) ?? []} owner={owner} goals={result?.data?.goals.filter(goal => !goal.completed_at) ?? []} onSave={refresh} /></aside>
         <section className="panel"><h2>Resumen del periodo</h2>
           <div className="filters">{periodControls}</div>
           {data ? <>
@@ -152,7 +152,7 @@ function PersonalBudget({ owner }: { owner: string }) {
           <span>{money(goal.saved)} de {money(goal.target)}</span></div>)}
     </section>
     <section className="panel" hidden={view !== "Tarjetas"}>
-      {data ? <CardsPanel owner={owner} cards={data.cards} onSave={refresh} /> : loadStatus}
+      {data ? <CardsPanel owner={owner} cards={data.cards.filter(card => !card.archived_at)} onSave={refresh} /> : loadStatus}
     </section>
     <section className="panel" hidden={view !== "Historial"}><h2>Historial de movimientos</h2>
           <div className="history-filters">

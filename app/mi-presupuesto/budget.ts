@@ -27,7 +27,7 @@ export function periodBounds(day: string, period: Period) {
 
 export type Entry = { id: string; kind: Kind; amount: number; category: string; occurred_at: string; concept: string; method: string; date_only: string | null; card_id: string | null; goal_id: string | null };
 export type Goal = { id: string; name: string; target: number; saved: number; completed_at: string | null };
-export type Card = { id: string; name: string; card_type: "Crédito" | "Débito"; cutoff_day: number | null; credit_limit: number | null; opening_available: number; available: number; balances: number[] };
+export type Card = { id: string; name: string; card_type: "Crédito" | "Débito"; cutoff_day: number | null; archived_at: string | null; credit_limit: number | null; opening_available: number; available: number; balances: number[] };
 export type Summary = { cards: Card[]; entries: Entry[]; goals: Goal[]; general: number };
 
 export function summarize(entries: Entry[]) {
