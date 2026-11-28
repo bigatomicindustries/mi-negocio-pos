@@ -21,7 +21,7 @@ export function periodBounds(day: string, period: Period) {
   const end = new Date(start);
   if (period === "Año") end.setFullYear(start.getFullYear() + 1);
   else if (period === "Mes") end.setMonth(start.getMonth() + 1);
-  else end.setDate(start.getDate() + (period === "Semana" ? 7 : 1));
+  else end.setDate(start.getDate() + (period === "Semana" ? 5 : 1));
   return { period_start: start.toISOString(), period_end: end.toISOString() };
 }
 
