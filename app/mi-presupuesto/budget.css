@@ -35,8 +35,8 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget [role=status]:not(:empty) { margin-top:.55rem; font-size:.875rem; }
 .budget .history-filters { display:flex; align-items:flex-end; gap:1rem; overflow-x:auto; padding:.25rem .1rem .75rem; }
 .budget .history-filters .choices { flex-wrap:nowrap; }
-.budget .history-filters label { margin:0 0 0 auto; flex:none; }
-.budget .history-filters input,.budget .history-filters button { height:2.65rem; }
+
+.budget .history-filters select,.budget .history-filters button { height:2.65rem; }
 .budget .movement-actions { display:flex; align-items:stretch; justify-content:space-between; gap:.4rem; }
 .budget .movement-actions .choices { flex-wrap:nowrap; }
 .budget .movement-actions button { padding:.5rem clamp(.3rem,.6vw,.65rem); font-size:.85rem; }
@@ -75,3 +75,10 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .editor-actions button { width:auto; border-radius:.6rem; padding:.65rem; }
 .budget .editor-actions button[type=button] { color:#9d3333; }
 .budget .editor-actions button.danger { background:#a92e34; color:white; }
+
+.budget .period-controls { display:flex; align-items:flex-end; flex-wrap:wrap; justify-content:flex-end; gap:.6rem 1rem; margin-left:auto; }
+.budget .history-filters .period-controls { flex-wrap:nowrap; flex:none; }
+.budget .reference-parts { display:flex; align-items:flex-end; gap:.35rem; }
+.budget .reference-parts label { margin:0; }
+.budget .reference-parts select { height:2.65rem; width:auto; padding-inline:.4rem; }
+.budget .reference-parts select:disabled { color:#64748b; background:#f1f5f9; }

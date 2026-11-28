@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import CardsPanel from "./CardsPanel";
+import PeriodControls from "./PeriodControls";
 import MovementDetail from "./MovementDetail";
 import MovementForm from "./MovementForm";
-import { kinds, localDate, money, periodBounds, periods, summarize, type Kind, type Period, type Summary } from "./budget";
+import { kinds, localDate, money, periodBounds, summarize, type Kind, type Period, type Summary } from "./budget";
 import "./budget.css";
 
 const views = ["Inicio", "Metas", "Tarjetas", "Historial"] as const;
@@ -93,8 +94,7 @@ function PersonalBudget({ owner }: { owner: string }) {
   const data = result?.key === key ? result.data : null;
   const totals = summarize(data?.entries ?? []);
   const history = data?.entries.filter(entry => filter === "Todos" || entry.kind === filter);
-  const periodControls = (<><div className="choices">{periods.map(item => <button key={item} aria-pressed={item === period} onClick={() => setPeriod(item)}>{item}</button>)}</div>
-            <label>Fecha de referencia<input type="date" value={day} onChange={e => { if (e.target.value && e.target.validity.valid) setDay(e.target.value); }} /></label></>);
+  const periodControls = <PeriodControls period={period} day={day} onPeriod={setPeriod} onDay={setDay} />;
   const loadStatus = result?.key === key
     ? <p role="alert">No se pudo cargar tu presupuesto. <button onClick={refresh}>Reintentar</button></p>
     : <p role="status">Cargando presupuesto…</p>;
