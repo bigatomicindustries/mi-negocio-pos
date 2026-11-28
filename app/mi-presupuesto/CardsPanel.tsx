@@ -2,15 +2,17 @@
 
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
+import CardEditor from "./CardEditor";
 import { money, type Card } from "./budget";
 
-function CardTile({ card }: { card: Card }) {
+function CardTile({ card, onEdit }: { card: Card; onEdit: () => void }) {
   const credit = card.card_type === "Crédito";
   const total = card.credit_limit ?? card.opening_available;
   const used = (Math.round(total * 100) - Math.round(card.available * 100)) / 100;
   const percent = total > 0 ? Math.min(100, Math.max(0, 100 * card.available / total)) : used === 0 ? 100 : 0;
   const baseLabel = credit ? (card.credit_limit == null ? "Crédito inicial registrado" : "Límite de crédito") : "Saldo inicial";
   return <article>
+    <button type="button" className="card-open" aria-label={`Editar tarjeta ${card.name}`} aria-haspopup="dialog" onClick={onEdit} />
     <header><h3>{card.name}</h3><small>{card.card_type}{card.cutoff_day && " · Corte el día " + card.cutoff_day}</small></header>
     <div className="card-amounts">
       <div><small>{baseLabel}</small><strong>{money(total)}</strong></div>
@@ -23,6 +25,7 @@ function CardTile({ card }: { card: Card }) {
 }
 
 export default function CardsPanel({ owner, cards, onSave }: { owner: string; cards: Card[]; onSave: () => void }) {
+  const [editing, setEditing] = useState<Card | null>(null);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<Card["card_type"]>("Crédito");
   const [busy, setBusy] = useState(false);
@@ -69,6 +72,7 @@ export default function CardsPanel({ owner, cards, onSave }: { owner: string; ca
         <label>Día de corte mensual{type === "Débito" && " (opcional)"}<input type="number" name="cutoff" step="1" min="1" max="31" required={type === "Crédito"} placeholder="1–31" /></label>
         <button className="primary" disabled={busy}>{busy ? "Guardando…" : "Guardar tarjeta"}</button>
       </fieldset><p role="status">{notice}</p></form>
-    <div className="personal-cards">{cards.map(card => <CardTile key={card.id} card={card} />)}</div>
+    <div className="personal-cards">{cards.map(card => <CardTile key={card.id} card={card} onEdit={() => setEditing(card)} />)}</div>
+    {editing && <CardEditor card={editing} owner={owner} onClose={() => setEditing(null)} onSave={onSave} />}
   </>;
 }
