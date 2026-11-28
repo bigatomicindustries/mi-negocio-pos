@@ -80,6 +80,8 @@ html:has(.budget), body:has(.budget) { overflow-x: clip; }
 .budget .editor-actions button.danger { background:#a92e34; color:white; }
 
 .budget .period-controls { display:flex; align-items:flex-end; flex-wrap:wrap; justify-content:flex-end; gap:.6rem 1rem; margin-left:auto; }
+.budget .filters { margin-bottom:1rem; }
+.budget .filters .period-controls button { height:2.65rem; }
 .budget .history-filters .period-controls { flex-wrap:nowrap; flex:none; }
 .budget .reference-parts { display:flex; align-items:flex-end; gap:.35rem; }
 .budget .reference-parts label { margin:0; }
