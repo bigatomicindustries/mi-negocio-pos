@@ -151,7 +151,7 @@ function PersonalBudget({ owner }: { owner: string }) {
           <small>Cumplida el {new Date(goal.completed_at!).toLocaleDateString("es-MX")}</small></div>
           <span>{money(goal.saved)} de {money(goal.target)}</span></div>)}
     </section>
-    <section className="panel" hidden={view !== "Tarjetas"}><h2>Mis tarjetas</h2>
+    <section className="panel" hidden={view !== "Tarjetas"}>
       {data ? <CardsPanel owner={owner} cards={data.cards} onSave={refresh} /> : loadStatus}
     </section>
     <section className="panel" hidden={view !== "Historial"}><h2>Historial de movimientos</h2>
