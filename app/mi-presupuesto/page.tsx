@@ -110,8 +110,11 @@ function PersonalBudget({ owner }: { owner: string }) {
     </div>
     <div className="layout" hidden={view !== "Inicio"}>
       <aside><MovementForm cards={result?.data?.cards.filter(card => !card.archived_at) ?? []} owner={owner} goals={result?.data?.goals.filter(goal => !goal.completed_at) ?? []} onSave={refresh} /></aside>
-        <section className="panel"><h2>Resumen del periodo</h2>
-          <div className="filters">{periodControls}</div>
+        <section className="panel">
+          <div className="summary-heading">
+            <h2>Resumen del periodo</h2>
+            {periodControls}
+          </div>
           {data ? <>
             <div className="metrics">{[["Ingresos", totals.income], ["Gastos", totals.expense], ["Ahorro apartado", totals.savings], ["Disponible del periodo", totals.available]].map(([label, value]) =>
               <div key={label}><small>{label}</small><strong>{money(Number(value))}</strong></div>)}</div>
